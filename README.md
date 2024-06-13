@@ -5,17 +5,16 @@ Queue your Blender render projects and override settings.
 ![image](https://github.com/lauwurence/kqueue_blender/assets/46109734/9eccb088-0220-4c4a-bd12-daa020a25241)
 
 ## What can it do:
-1. Fetch project data and cache it.
-2. Render specific frame ranges.
+1. Fetch and cache Blender projects data.
+2. Render specific frame ranges, override render settings.
 3. Turn screens off.
 4. Shutdown PC on complete.
 
 ## Installation:
-Required libraries: PyQt5, pygame
+Required libraries: PyQt5, pygame (to play audio).
 
 ```
-pip install PyQt5
-pip install pygame
+pip install PyQt5; pygame
 ```
 
 ## Run:
