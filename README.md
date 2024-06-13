@@ -1,5 +1,4 @@
 # kQueue Blender
-Blender Render Queue Program
 Queue your Blender render projects and override settings.
 
 ![image](https://github.com/lauwurence/kqueue_blender/assets/46109734/9eccb088-0220-4c4a-bd12-daa020a25241)
