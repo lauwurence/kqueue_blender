@@ -15,7 +15,7 @@ import ctypes
 
 from os.path import normpath, join
 from pathlib import Path
-from utils import monitor, audio
+from utils import monitor
 from utils.navigation import open_folder
 
 from project import BlendProject, BlendProjectWindow
@@ -25,7 +25,7 @@ import store
 
 ################################################################################
 
-DEV_MODE = False
+DEV_MODE = True
 store.working_dir = normpath(os.getcwd())
 
 ################################################################################
@@ -81,6 +81,10 @@ class QueuePreset():
     def locate_blender(self):
         filename, _ = qtw.QFileDialog.getOpenFileName(mw, 'Single File', "H:/Blender Foundation/blender-4.1.1", 'blender.exe')
         if not filename: return
+        self.set_blender(filename)
+
+
+    def set_blender(self, filename):
         self.blender_exe = filename
         mw.w_pathToBlender.setText(filename)
         log(f'Blender: {filename}')
@@ -626,7 +630,7 @@ QListWidget {
 ################################################################################
 
 if DEV_MODE:
-    mw.blender_exe = "H:/Blender Foundation/blender-4.1.1/blender.exe"
+    preset.set_blender("H:/Blender Foundation/blender-4.1.1/blender.exe")
     preset.add_projects("I:/Blender Library/kQueue test 1.blend",
                         "I:/Blender Library/00_Parts/00_Intro/03_HomeRoaming/fire.blend")
     mw.update()
