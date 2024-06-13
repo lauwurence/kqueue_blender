@@ -25,7 +25,7 @@ import store
 
 ################################################################################
 
-DEV_MODE = True
+DEV_MODE = False
 store.working_dir = normpath(os.getcwd())
 
 ################################################################################
@@ -305,7 +305,7 @@ class MainWindow(qtw.QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle(TITLE)
+        self.setWindowTitle(TITLE if not DEV_MODE else APPID)
         self.setMinimumWidth(1200)
         self.setMinimumHeight(600)
         self.setAcceptDrops(True)
