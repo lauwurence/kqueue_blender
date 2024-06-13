@@ -8,7 +8,7 @@ import PyQt5.QtWidgets as qtw
 import PyQt5.QtGui as qtg
 from PyQt5.QtCore import Qt
 
-from os.path import normpath, join
+from os.path import normpath
 from utils.filter_frames import filter_frames
 
 
