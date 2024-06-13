@@ -20,3 +20,10 @@ pip install PyQt5; psutil; pygame
 ## Run:
 Run `start.pyw`, locate your `blender.exe` executable, drop your Blender projects into the program interface.
 Change the order by dragging items, double click to rewrite settings, save and click "Render".
+
+## Documentation:
+**Frames**
+You can define frames, frame ranges or exclude specific frames.
+Input: 1-4 | Output [1, 2, 3, 4]
+Input: 2-4, 6,7 | Output: [2, 3, 4, 6, 7]
+Input: 1-6, ^5 | Output: [1, 2, 3, 4, 6]
