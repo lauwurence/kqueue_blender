@@ -12,7 +12,7 @@ Queue your Blender render projects and override settings.
 
 ## Installation:
 Required libraries: PyQt5 (to draw the UI), psutil (to kill processes), pygame (to play audio).
-
+Install Python 3 and write this into console:
 ```
 pip install PyQt5; psutil; pygame
 ```
