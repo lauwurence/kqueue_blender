@@ -23,6 +23,7 @@ Change the order by dragging items, double click to rewrite settings, save and c
 
 ## Documentation:
 **Frames**
+
 You can define frames, frame ranges or exclude specific frames.
 Input: 1-4 | Output [1, 2, 3, 4]
 Input: 2-4, 6,7 | Output: [2, 3, 4, 6, 7]
