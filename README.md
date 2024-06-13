@@ -1,4 +1,4 @@
-# kQueue Bleder
+# kQueue Blender
 Blender Render Queue Program
 Queue your Blender render projects and override settings.
 
