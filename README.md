@@ -1,2 +1,2 @@
-# kqueue_blender
+# kQueue Bleder
 Blender Render Queue Program
