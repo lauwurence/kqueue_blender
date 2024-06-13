@@ -19,4 +19,4 @@ pip install PyQt5; psutil; pygame
 
 ## Run:
 Run `start.pyw`, locate your `blender.exe` executable, drop your Blender projects into the program interface.
-Rearrange the order by dragging items, double click to rewrite settings, save and click "Render".
+Change the order by dragging items, double click to rewrite settings, save and click "Render".
