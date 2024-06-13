@@ -11,12 +11,12 @@ Queue your Blender render projects and override settings.
 4. Shutdown PC on complete.
 
 ## Installation:
-Required libraries: PyQt5, pygame (to play audio).
+Required libraries: PyQt5 (to draw the UI), pygame (to play audio).
 
 ```
 pip install PyQt5; pygame
 ```
 
 ## Run:
-Run `start.pyw`, locate your `blender.exe` executable, drag your Blender projects drop into the program interface.
-Rearrange the order by dragging them, double click to rewrite settings.
+Run `start.pyw`, locate your `blender.exe` executable, drop your Blender projects into the program interface.
+Rearrange the order by dragging items, double click to rewrite settings, save and click "Render".
