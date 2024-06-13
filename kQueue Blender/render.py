@@ -81,7 +81,7 @@ blender --background "{project.file}" --scene "{sc}" -E "CYCLES" --python "{PYTO
                                     stdin=subprocess.PIPE,
                                     cwd=normpath(Path(preset.blender_exe).parent),
                                     #    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, #DETACHED_PROCESS
-                                    #    creationflags=subprocess.DETACHED_PROCESS, #DETACHED_PROCESS
+                                    creationflags=subprocess.CREATE_NO_WINDOW,
                                     #    preexec_fn=os.setsid,
                                     shell=False
                                     )
