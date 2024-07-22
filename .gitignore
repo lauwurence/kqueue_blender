@@ -1,7 +1,10 @@
+__pycache__/
+*.py[cod]
+*.cache
+
 # Folders
-__pycache__
-temp
-old
+temp/
+old/
 
 # Extensions
 *.psd
