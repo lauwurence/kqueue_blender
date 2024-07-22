@@ -1,0 +1,11 @@
+# Folders
+__pycache__
+temp
+old
+
+# Extensions
+*.psd
+
+# Files
+test.py
+cache.json
