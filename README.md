@@ -1,7 +1,7 @@
 # kQueue Blender
 Queue your Blender render projects and override settings.
 
-![image](https://github.com/user-attachments/assets/a3d36dfc-eb13-4170-b0dd-00f9c78f862e)
+![image](https://github.com/user-attachments/assets/fc5a8bfc-e99e-4699-b25b-9f8eb8a986d4)
 
 ## What can it do:
 1. Save and load files.
