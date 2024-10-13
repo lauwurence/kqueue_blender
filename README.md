@@ -4,21 +4,22 @@ Queue your Blender render projects and override settings.
 ![image](https://github.com/user-attachments/assets/a3d36dfc-eb13-4170-b0dd-00f9c78f862e)
 
 ## What can it do:
-1. Fetch and cache Blender projects data.
-2. Render specific frame ranges, override render settings.
-3. Turn screens off.
-4. Shutdown PC on complete.
+1. Save and load files.
+2. Fetch and cache Blender project data.
+3. Render specific frame ranges, override render settings.
+4. Turn screens off.
+5. Shutdown PC on complete.
 
 ## Installation:
-Required libraries: PyQt5 (to draw the UI), psutil (to kill processes), pygame (to play audio).
-Install Python 3 and write this into console:
+Required libraries: PyQt5 (to draw the UI), psutil (to kill processes), pygame (to play sounds).
+Install Python 3 and put this into the console:
 ```
 pip install PyQt5; psutil; pygame
 ```
 
 ## Run:
-Run `start.pyw`, locate your `blender.exe` executable, drop your Blender projects into the program interface.
-Change the order by dragging items, double click to rewrite settings, save and click "Render".
+Run `start.pyw`, locate the `blender.exe` executable, drop your Blender projects into the program interface, save the file.
+Change the order by dragging items, double click to rewrite settings, save and start rendering.
 
 ## Documentation:
 You can define frames, frame ranges or exclude specific frames.
