@@ -1,7 +1,7 @@
 # kQueue Blender
 Queue your Blender render projects and override settings.
 
-![image](https://github.com/lauwurence/kqueue_blender/assets/46109734/9eccb088-0220-4c4a-bd12-daa020a25241)
+![image](https://github.com/user-attachments/assets/a3d36dfc-eb13-4170-b0dd-00f9c78f862e)
 
 ## What can it do:
 1. Fetch and cache Blender projects data.
