@@ -80,7 +80,7 @@ class BlendProjectWindow(qtw.QWidget):
 
         # Window
         self.setWindowTitle("Project Settings")
-        self.setWindowIcon(qtg.QIcon(ICON))
+        self.setWindowIcon(qtg.QIcon("kqueue/" + ICON))
         self.setMinimumWidth(450)
         self.setFixedHeight(450)
         self.setWindowModality(Qt.ApplicationModal)
@@ -126,8 +126,9 @@ class BlendProjectWindow(qtw.QWidget):
             filepath, _ = qtw.QFileDialog.getSaveFileName(self, 'Set Render Filepath', w_renderFilepath.text())
             if not filepath: return
             w_renderFilepath.setText(normpath(filepath))
-        w_locateFilepath = qtw.QPushButton(">", clicked=locate_filepath)
+        w_locateFilepath = qtw.QPushButton("", clicked=locate_filepath)
         w_locateFilepath.clicked.connect(lambda: self.update())
+        w_locateFilepath.setIcon(qtg.QIcon('kqueue/icons/load.svg'))
         w_locateFilepath.setFixedWidth(30)
         w_hBoxLayoutRenderFilepath.addWidget(w_locateFilepath)
 

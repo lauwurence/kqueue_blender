@@ -14,11 +14,11 @@ import threading
 import time
 import ctypes
 
-from os.path import normpath, join
 from pathlib import Path
+
 from .utils import monitor
 from .utils.navigation import open_folder
-
+from .utils.path import join
 from .project import BlendProject, BlendProjectWindow
 from .render import RenderWorker
 from .config import *
@@ -27,25 +27,46 @@ from . import store
 ################################################################################
 
 DEV_MODE = False
-store.working_dir = normpath(os.getcwd() + "/kqueue")
+store.working_dir = join(os.getcwd() + "/kqueue")
+
 
 ################################################################################
 
 class QueuePreset():
 
     def __init__(self):
+
+        # Loaded save filename.
+        self.loaded_save = None
+
+        # Path to Blender executable.
         self.blender_exe = None
+
+        # List of project objects.
         self.project_list = []
+
+        # Process object.
         self.process = None
 
+        # Status.
         self.blender_status = 'READY_TO_RENDER'
+
+        # Are we currently loading new blender projects?
         self.is_adding_projects = False
+
+        # Are we currently shutting down the PC?
         self.is_shutting_down = False
 
         self.init_render_variables()
 
 
     def init_render_variables(self, gui=False):
+        """
+        Initialize or reset render variables for GUI.
+
+        `gui` - update interface?
+        """
+
         self.global_render_start_time = time.time()
         self.render_start_time = time.time()
         self.render_avg_time = set()
@@ -90,10 +111,62 @@ class QueuePreset():
         log(f'Blender: {filename}')
 
 
+    def save_as(self):
+        """
+        Save as...
+        """
+
+        path = join(store.working_dir, SAVE_FOLDER)
+        os.makedirs(path, exist_ok=True)
+
+        filename, _ = qtw.QFileDialog.getSaveFileName(mw, 'Save', path, "kQueue Project (*.kqp)")
+        if not filename: return
+
+        from .save_load import save
+
+        save([self.project_list, self.blender_exe], filename, version=1)
+
+        self.set_save(filename)
+
+
+    def load_from(self):
+        """
+        Load save from...
+        """
+
+        path = join(store.working_dir, SAVE_FOLDER)
+        os.makedirs(path, exist_ok=True)
+
+        filename, _ = qtw.QFileDialog.getOpenFileName(mw, 'Load', path, "kQueue Project (*.kqp)")
+        if not filename: return
+
+        from .save_load import load
+        version, data = load(filename)
+
+        if version == 1:
+            self.project_list, blender_exe = data
+            self.set_blender(blender_exe)
+
+        self.set_save(filename)
+        mw.update_list()
+
+
+    def set_save(self, filename):
+
+        if not filename or not Path(filename).exists():
+            return
+
+        self.loaded_save = filename
+        log(f'Save: {filename}')
+
+        mw.set_window_title(filename)
+
+
     def add_projects(self, *files):
         """
         Add projects in background.
         """
+
         if not self.blender_exe:
             log("Locate blender.exe first!")
             return
@@ -107,10 +180,10 @@ class QueuePreset():
 
     def __add_projects(self, *files):
 
-        os.makedirs(normpath(join(store.working_dir, "blender/temp")), exist_ok=True)
-        CACHE_FILE = normpath(join(store.working_dir, "blender/cache.json"))
-        DATA_FILE = normpath(join(store.working_dir, "blender/temp/data.json"))
-        GET_DATA_PY = normpath(join(store.working_dir, "blender/get_data.py"))
+        os.makedirs(join(store.working_dir, "blender/temp"), exist_ok=True)
+        CACHE_FILE = join(store.working_dir, "blender/cache.json")
+        DATA_FILE = join(store.working_dir, "blender/temp/data.json")
+        GET_DATA_PY = join(store.working_dir, "blender/get_data.py")
 
         self.is_adding_projects = True
         mw.update()
@@ -126,7 +199,7 @@ class QueuePreset():
         else:
             cache = {}
 
-        files = [ normpath(file) for file in files if file.endswith(".blend")]
+        files = [ join(file) for file in files if file.endswith(".blend")]
         amount = 0
 
         for i, file in enumerate(files):
@@ -153,7 +226,7 @@ class QueuePreset():
 
             # Get project data
             else:
-                BATCH_FILE = normpath(join(store.working_dir, f'blender/temp/get_data.bat'))
+                BATCH_FILE = join(store.working_dir, f'blender/temp/get_data.bat')
                 BATCH = f"""
 @CHCP 65001 > NUL
 blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA_FILE}"
@@ -171,7 +244,7 @@ blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA
                                         #    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, #DETACHED_PROCESS
                                         #    creationflags=subprocess.DETACHED_PROCESS, #DETACHED_PROCESS
                                         #    preexec_fn=os.setsid,
-                                        cwd=normpath(Path(self.blender_exe).parent),
+                                        cwd=join(Path(self.blender_exe).parent),
                                         shell=True
                                         )
 
@@ -249,6 +322,7 @@ blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA
         """
         Stop rendering process.
         """
+
         if not self.is_status('RENDERING') or not self.process:
             return
 
@@ -313,7 +387,7 @@ class MainWindow(qtw.QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle(TITLE if not DEV_MODE else APPID)
+        self.set_window_title()
         self.setMinimumWidth(1200)
         self.setMinimumHeight(600)
         self.setAcceptDrops(True)
@@ -332,10 +406,28 @@ class MainWindow(qtw.QMainWindow):
             w_hBoxLayout = qtw.QHBoxLayout()
             w_vBoxLayout.addLayout(w_hBoxLayout)
 
+            # [button] Save
+            self.w_locateSave = w_locateSave = qtw.QPushButton("", clicked=lambda: preset.save_as())
+            w_locateSave.clicked.connect(lambda: self.update())
+            w_locateSave.setIcon(qtg.QIcon('kqueue/icons/save.svg'))
+            w_locateSave.setToolTip("Save the current file in the desired location.")
+            # w_locateSave.setFixedWidth(100)
+            w_hBoxLayout.addWidget(w_locateSave)
+
+            # [button] Load
+            self.w_locateLoad = w_locateLoad = qtw.QPushButton("", clicked=lambda: preset.load_from())
+            w_locateLoad.clicked.connect(lambda: self.update())
+            w_locateLoad.setIcon(qtg.QIcon('kqueue/icons/load.svg'))
+            w_locateLoad.setToolTip("Open a kQueue file.")
+            # w_locateLoad.setFixedWidth(100)
+            w_hBoxLayout.addWidget(w_locateLoad)
+
             # [button] Locate Blender
-            w_locateBlender = qtw.QPushButton("Locate", clicked=lambda: preset.locate_blender())
+            self.w_locateBlender = w_locateBlender = qtw.QPushButton("", clicked=lambda: preset.locate_blender())
             w_locateBlender.clicked.connect(lambda: self.update())
-            w_locateBlender.setFixedWidth(100)
+            w_locateBlender.setIcon(qtg.QIcon('kqueue/icons/blender.svg'))
+            w_locateBlender.setToolTip("Locate a Blender executable.")
+            # w_locateBlender.setFixedWidth(100)
             w_hBoxLayout.addWidget(w_locateBlender)
 
             # [edit] Path to Blender
@@ -463,13 +555,17 @@ class MainWindow(qtw.QMainWindow):
         w_hBoxLayout.addLayout(w_hBoxLayoutRender)
 
         # [button] Start Render
-        self.w_startRender = w_startRender = qtw.QPushButton("Render", clicked=lambda: preset.start_render())
+        self.w_startRender = w_startRender = qtw.QPushButton("", clicked=lambda: preset.start_render())
+        w_startRender.setIcon(qtg.QIcon('kqueue/icons/play.svg'))
+        w_startRender.setToolTip("Start rendering.")
         w_startRender.setFixedWidth(100)
         w_startRender.setFixedHeight(40)
         w_hBoxLayoutRender.addWidget(w_startRender)
 
         # [button] Stop Render
-        self.w_stopRender = w_stopRender = qtw.QPushButton("Stop", clicked=lambda: preset.stop_render())
+        self.w_stopRender = w_stopRender = qtw.QPushButton("", clicked=lambda: preset.stop_render())
+        w_stopRender.setIcon(qtg.QIcon('kqueue/icons/stop.svg'))
+        w_stopRender.setToolTip("Stop rendering.")
         w_stopRender.setFixedWidth(100)
         w_stopRender.setFixedHeight(40)
         w_hBoxLayoutRender.addWidget(w_stopRender, 1, Qt.AlignLeft)
@@ -477,16 +573,35 @@ class MainWindow(qtw.QMainWindow):
         w_hBoxLayout.addSpacing(150)
 
         # [button] Screens Off
-        w_screensOff = qtw.QPushButton("Screens Off", clicked=lambda: monitor.screen_off())
-        w_screensOff.setFixedWidth(100)
+        w_screensOff = qtw.QPushButton("", clicked=lambda: monitor.screen_off())
+        w_screensOff.setIcon(qtg.QIcon('kqueue/icons/screen_off.svg'))
+        w_screensOff.setToolTip("Turn off the screens.")
+        w_screensOff.setFixedWidth(40)
         w_screensOff.setFixedHeight(40)
         w_hBoxLayout.addWidget(w_screensOff, 0, Qt.AlignRight)
+
+
+    def set_window_title(self, save_filename=None):
+        """
+        """
+
+        title = TITLE if not DEV_MODE else APPID
+        title += " " + ".".join([str(v) for v in VERSION])
+
+        if save_filename:
+            fn = save_filename.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+            title = f'{fn} [{save_filename}] - {title}'
+        else:
+            title = f'(Unsaved) - {title}'
+
+        self.setWindowTitle(title)
 
 
     def update_list(self, rearrange=False):
         """
         Update list widget and `preset.project_list` list.
         """
+
         if rearrange:
             file_list = []
 
@@ -526,6 +641,17 @@ class MainWindow(qtw.QMainWindow):
 
 
     def update(self):
+
+        if preset.is_status('RENDERING') or preset.is_status('RENDERING_STOPPING'):
+            self.w_locateSave.setEnabled(False)
+            self.w_locateLoad.setEnabled(False)
+            self.w_locateBlender.setEnabled(False)
+
+        else:
+            self.w_locateSave.setEnabled(True)
+            self.w_locateLoad.setEnabled(True)
+            self.w_locateBlender.setEnabled(True)
+
         self.w_openFolder.setEnabled(bool(preset.blender_exe))
         self.w_startRender.setEnabled(bool(preset.blender_exe and not preset.is_status('RENDERING') and preset.project_list))
         self.w_stopRender.setEnabled(preset.is_status('RENDERING') and not preset.is_status('RENDERING_STOPPING'))
@@ -541,7 +667,9 @@ class MainWindow(qtw.QMainWindow):
 
 
     def keyPressEvent(self, event):
+
         if event.key() == Qt.Key_Delete:
+
             if preset.project_list:
                 project = self.get_selected_project()
                 preset.project_list.remove(project)
@@ -553,11 +681,14 @@ class MainWindow(qtw.QMainWindow):
         """
         Get selected project.
         """
+
         item = self.w_listOfProjects.currentItem()
         file = item.text().split(".blend")[0] + ".blend"
+
         for p in preset.project_list:
             if p.file == file:
                 return p
+
         return None
 
 
@@ -565,6 +696,7 @@ class MainWindow(qtw.QMainWindow):
         """
         Add project.
         """
+
         files = [ url.toLocalFile() for url in event.mimeData().urls() ]
         preset.add_projects(*files)
 
@@ -573,6 +705,7 @@ class MainWindow(qtw.QMainWindow):
         """
         Close [x] event.
         """
+
         result = qtw.QMessageBox.question(self,
                       "Confirm Exit...",
                       "Are you sure you want to exit?",
@@ -596,15 +729,16 @@ def log(*args, developer=False):
     """
     Print log in console and output text.
     """
+
     if developer and not DEV_MODE:
         return
+
     line = " ".join(args).rstrip()
     mw.set_log_text(line)
     print(line)
 
 
 ################################################################################
-
 
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APPID)
 store.app = app = qtw.QApplication([])
@@ -658,7 +792,7 @@ app_icon = qtg.QIcon()
 for size in [16, 24, 32, 48, 64, 128, 256]:
     path, suffix = ICON.rsplit(".", 1)
     icon_filename = join(store.working_dir, ICON)
-    filename = normpath(join(store.working_dir, f'{path}_{size}x{size}.{suffix}'))
+    filename = join(store.working_dir, f'{path}_{size}x{size}.{suffix}')
 
     if DEV_MODE:
         from PIL import Image

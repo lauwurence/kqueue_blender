@@ -5,9 +5,11 @@ __pycache__/
 # Folders
 temp/
 old/
+saves/
 
 # Extensions
 *.psd
+*.jqp
 
 # Files
 test.py
