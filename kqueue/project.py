@@ -6,6 +6,7 @@ from .config import *
 
 import PyQt5.QtWidgets as qtw
 import PyQt5.QtGui as qtg
+import PyQt5.QtCore as qtc
 from PyQt5.QtCore import Qt
 
 from os.path import normpath
@@ -73,14 +74,17 @@ class BlendProject():
 
 class BlendProjectWindow(qtw.QWidget):
 
+    wResult_setText = qtc.pyqtSignal(str)
+
 
     def __init__(self, project):
         super().__init__()
+
         self.project = project
 
         # Window
         self.setWindowTitle("Project Settings")
-        self.setWindowIcon(qtg.QIcon("kqueue/" + ICON))
+        self.setWindowIcon(qtg.QIcon(ICON))
         self.setMinimumWidth(450)
         self.setFixedHeight(450)
         self.setWindowModality(Qt.ApplicationModal)
@@ -93,7 +97,7 @@ class BlendProjectWindow(qtw.QWidget):
         font = qtg.QFont()
         font.setPixelSize(15)
 
-        self.label = qtw.QLabel(f"{project.file}")
+        self.label = qtw.QLabel(str(project.file))
         self.label.setFont(font)
         layout.addWidget(self.label, 0, Qt.AlignTop)
 
@@ -105,6 +109,18 @@ class BlendProjectWindow(qtw.QWidget):
         self.w_frames = w_frames = qtw.QLineEdit(str(project.get_frames()))
         w_frames.setPlaceholderText(str(project.frames))
         l_form.addRow("Frames", self.w_frames)
+
+        # # [label] Frames Result
+        # self.w_result = w_result = qtw.QLabel("")
+        # self.w_result.setFont(font)
+        # l_form.addRow("", w_result)
+
+        # self.wResult_setText.connect(w_result.setText)
+        # self.w_frames.textChanged.connect(self.wResult_setText.emit)
+        # .w_result.setText(f'{self.project.get_frames_list()}')
+
+        # w_frames.
+        # w_result.setText("!")
 
         # [edit] Samples
         self.w_samples = w_samples = qtw.QLineEdit(str(project.get_samples()))
@@ -199,29 +215,70 @@ class BlendProjectWindow(qtw.QWidget):
         w_cancel.setFixedHeight(40)
         w_hBoxLayout.addWidget(w_cancel)
 
+        self.update_frames_result()
+
 
     def keyPressEvent(self, event):
+
         if event.key() == Qt.Key_Escape:
             self.close()
+
         elif event.key() == Qt.Key_Return:
             self.save_and_close()
 
+
+    def update_frames_result(self):
+        """
+        """
+
+        self.wResult_setText.emit(f'{self.project.get_frames_list()}')
+        print(f'{self.project.get_frames_list()}')
+
+        # self.w_result.setText(f'{self.project.get_frames_list()}')
+
+
     def save_and_close(self):
+        """
+        """
+
         self.save()
         self.close()
         store.mw.update_list()
 
+
     def save(self):
-        project = self.project
-        project.frames_override = self.w_frames.text()
-        project.samples_override = self.w_samples.text()
-        project.render_filepath_override = self.w_renderFilepath.text()
-        project.camera_override = self.w_camera.currentText()
-        project.scene_override = self.w_scene.currentText()
-        project.use_persistent_data_override = eval(self.w_usePersistentData.text())
-        project.use_adaptive_sampling_override = eval(self.w_useAdaptiveSampling.text())
-        project.denoiser_override = self.w_denoiser.currentText()
-        project.denoising_use_gpu_override = eval(self.w_denoiserUseGPU.text())
-        print(project.denoising_use_gpu_override)
-        project.denoising_input_passes = self.w_denoiserInputPasses.currentText()
-        project.denoising_prefilter = self.w_denoiserPrefilter.currentText()
+        """
+        """
+
+        def set_value(variable, value):
+
+            if getattr(self.project, variable) == value:
+                return
+
+            setattr(self.project, variable, value)
+            store.preset.need_save(True)
+
+        set_value('frames_override', self.w_frames.text())
+        set_value('samples_override', self.w_samples.text())
+        set_value('render_filepath_override', self.w_renderFilepath.text())
+        set_value('camera_override', self.w_camera.currentText())
+        set_value('scene_override', self.w_scene.currentText())
+        set_value('use_persistent_data_override', eval(self.w_usePersistentData.text()))
+        set_value('use_adaptive_sampling_override', eval(self.w_useAdaptiveSampling.text()))
+        set_value('denoiser_override', self.w_denoiser.currentText())
+        set_value('denoising_use_gpu_override', eval(self.w_denoiserUseGPU.text()))
+        set_value('denoising_input_passes', self.w_denoiserInputPasses.currentText())
+        set_value('denoising_prefilter', self.w_denoiserPrefilter.currentText())
+
+
+        # project.frames_override = self.w_frames.text()
+        # project.samples_override = self.w_samples.text()
+        # project.render_filepath_override = self.w_renderFilepath.text()
+        # project.camera_override = self.w_camera.currentText()
+        # project.scene_override = self.w_scene.currentText()
+        # project.use_persistent_data_override = eval(self.w_usePersistentData.text())
+        # project.use_adaptive_sampling_override = eval(self.w_useAdaptiveSampling.text())
+        # project.denoiser_override = self.w_denoiser.currentText()
+        # project.denoising_use_gpu_override = eval(self.w_denoiserUseGPU.text())
+        # project.denoising_input_passes = self.w_denoiserInputPasses.currentText()
+        # project.denoising_prefilter = self.w_denoiserPrefilter.currentText()

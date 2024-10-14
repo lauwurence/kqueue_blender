@@ -1,7 +1,9 @@
+################################################################################
 
 # import ctypes
 import win32api
 import win32con
+
 
 def screen_off():
     print("Turning screen off...")
@@ -9,6 +11,7 @@ def screen_off():
                          win32con.WM_SYSCOMMAND,
                          win32con.SC_MONITORPOWER, 2)
     # ctypes.windll.user32.SendMessageW(65535, 274, 61808, 2)
+
 
 def screen_on():
     print("Turning screen on...")

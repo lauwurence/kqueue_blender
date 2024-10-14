@@ -4,6 +4,7 @@
 from pickle import dump as p_dump
 from pickle import load as p_load
 
+
 def save(data, filename, version):
     """
     Save project.

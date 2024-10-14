@@ -15,12 +15,17 @@ from .config import *
 from . import store
 
 
+################################################################################
+
 class RenderWorker(qtc.QThread):
+
     finished = qtc.pyqtSignal()
     listener_started = False
 
+
     def __init__(self):
         super().__init__()
+
 
     def run(self):
         preset = store.preset
@@ -124,7 +129,10 @@ blender --background "{project.file}" --scene "{sc}" -E "CYCLES" --python "{PYTO
         self.finished.emit()
 
 
+################################################################################
+
 class RenderListenWorker(qtc.QThread):
+
     finished = qtc.pyqtSignal()
     mw_update = qtc.pyqtSignal()
     mw_log = qtc.pyqtSignal(str)
@@ -141,8 +149,10 @@ class RenderListenWorker(qtc.QThread):
     listOfProjects_setCurrentItem = qtc.pyqtSignal(object)
     listOfProjects_setStyleSheet = qtc.pyqtSignal(str)
 
+
     def __init__(self):
         super().__init__()
+
 
     def run(self):
         """

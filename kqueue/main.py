@@ -5,20 +5,20 @@ import os
 import sys
 import json
 import psutil
-import PyQt5.QtWidgets as qtw
-import PyQt5.QtGui as qtg
-import PyQt5.QtCore as qtc
-from PyQt5.QtCore import Qt
 import subprocess
 import threading
 import time
 import ctypes
 
+import PyQt5.QtWidgets as qtw
+import PyQt5.QtGui as qtg
+import PyQt5.QtCore as qtc
+from PyQt5.QtCore import Qt
+
 from pathlib import Path
 
 from .utils import monitor
-from .utils.navigation import open_folder
-from .utils.path import join
+from .utils.path import join, open_folder
 from .project import BlendProject, BlendProjectWindow
 from .render import RenderWorker
 from .config import *
@@ -57,7 +57,18 @@ class QueuePreset():
         # Are we currently shutting down the PC?
         self.is_shutting_down = False
 
+        # Save needed?
+        self.save_needed = False
+
         self.init_render_variables()
+
+
+    def need_save(self, value=True):
+        """
+        """
+
+        self.save_needed = value
+        mw.update_title()
 
 
     def init_render_variables(self, gui=False):
@@ -86,16 +97,21 @@ class QueuePreset():
 
 
     def set_status(self, value, gui=True):
+
         if value not in ['READY_TO_RENDER', 'RENDERING', 'RENDERING_STOPPING', 'RENDERING_FINISHED']:
             raise Exception(f'Unknown status "{value}".')
+
         self.blender_status = value
         # if gui: log(f'Status: {self.blender_status}', developer=True)
 
 
     def is_status(self, *values):
+
         for value in values:
+
             if value not in ['READY_TO_RENDER', 'RENDERING', 'RENDERING_STOPPING', 'RENDERING_FINISHED']:
                 raise Exception(f'Unknown status "{value}".')
+
         return self.blender_status in values
 
 
@@ -106,9 +122,15 @@ class QueuePreset():
 
 
     def set_blender(self, filename):
+
+        if filename == self.blender_exe:
+            return
+
         self.blender_exe = filename
         mw.w_pathToBlender.setText(filename)
+
         log(f'Blender: {filename}')
+        self.need_save()
 
 
     def save_as(self):
@@ -127,6 +149,7 @@ class QueuePreset():
         save([self.project_list, self.blender_exe], filename, version=1)
 
         self.set_save(filename)
+        self.need_save(False)
 
 
     def load_from(self):
@@ -148,6 +171,8 @@ class QueuePreset():
             self.set_blender(blender_exe)
 
         self.set_save(filename)
+        self.need_save(False)
+
         mw.update_list()
 
 
@@ -159,7 +184,7 @@ class QueuePreset():
         self.loaded_save = filename
         log(f'Save: {filename}')
 
-        mw.set_window_title(filename)
+        mw.update_title()
 
 
     def add_projects(self, *files):
@@ -288,6 +313,8 @@ blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA
             mw.update_list(rearrange=False)
             amount += 1
 
+            self.need_save()
+
         if amount: log(f'All projects loaded!')
         self.is_adding_projects = False
         mw.update()
@@ -297,6 +324,7 @@ blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA
         """
         Start rendering process.
         """
+
         if not self.is_status('READY_TO_RENDER') or not preset.project_list:
             return
 
@@ -343,6 +371,7 @@ blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA
         """
         Show countdown and shotdown PC.
         """
+
         if mw.w_onComplete.currentText() != 'SHUTDOWN':
             return
 
@@ -374,9 +403,9 @@ blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA
         """
         Cancel shutting down process.
         """
+
         self.is_shutting_down = False
         mw.update()
-
 
 
 ################################################################################
@@ -387,7 +416,9 @@ class MainWindow(qtw.QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.set_window_title()
+        self.update_title()
+        self.setWindowIcon(qtg.QIcon(ICON))
+
         self.setMinimumWidth(1200)
         self.setMinimumHeight(600)
         self.setAcceptDrops(True)
@@ -438,6 +469,7 @@ class MainWindow(qtw.QMainWindow):
             # [button] Locate Blender
             self.w_openFolder = w_openFolder = qtw.QPushButton("Open Folder", clicked=lambda: open_folder(preset.blender_exe))
             w_openFolder.setFixedWidth(100)
+            w_openFolder.setEnabled(False)
             w_hBoxLayout.addWidget(w_openFolder)
 
         # [list] List of Projects
@@ -548,6 +580,7 @@ class MainWindow(qtw.QMainWindow):
         # [button] Cancel Shutdown
         self.w_cancelShutdown = w_cancelShutdown = qtw.QPushButton("Cancel", clicked=lambda: preset.cancel_shutdown())
         w_cancelShutdown.setFixedHeight(30)
+        w_cancelShutdown.setEnabled(False)
         w_hBoxLayoutOnComplete.addWidget(w_cancelShutdown, 2, Qt.AlignLeft)
 
         # ! [hbox] Start & Stop
@@ -560,6 +593,7 @@ class MainWindow(qtw.QMainWindow):
         w_startRender.setToolTip("Start rendering.")
         w_startRender.setFixedWidth(100)
         w_startRender.setFixedHeight(40)
+        w_startRender.setEnabled(False)
         w_hBoxLayoutRender.addWidget(w_startRender)
 
         # [button] Stop Render
@@ -568,6 +602,7 @@ class MainWindow(qtw.QMainWindow):
         w_stopRender.setToolTip("Stop rendering.")
         w_stopRender.setFixedWidth(100)
         w_stopRender.setFixedHeight(40)
+        w_stopRender.setEnabled(False)
         w_hBoxLayoutRender.addWidget(w_stopRender, 1, Qt.AlignLeft)
 
         w_hBoxLayout.addSpacing(150)
@@ -581,16 +616,23 @@ class MainWindow(qtw.QMainWindow):
         w_hBoxLayout.addWidget(w_screensOff, 0, Qt.AlignRight)
 
 
-    def set_window_title(self, save_filename=None):
+    def update_title(self):
         """
         """
 
         title = TITLE if not DEV_MODE else APPID
         title += " " + ".".join([str(v) for v in VERSION])
 
-        if save_filename:
-            fn = save_filename.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-            title = f'{fn} [{save_filename}] - {title}'
+        if store.preset and store.preset.loaded_save:
+            filename = store.preset.loaded_save
+            save_needed = store.preset.save_needed
+
+            fn = filename.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+            title = f'{fn} [{filename}] - {title}'
+
+            if save_needed:
+                title = "* " + title
+
         else:
             title = f'(Unsaved) - {title}'
 
@@ -660,6 +702,7 @@ class MainWindow(qtw.QMainWindow):
 
 
     def dragEnterEvent(self, event):
+
         if event.mimeData().hasUrls():
             event.accept()
         else:
@@ -776,6 +819,7 @@ QListWidget {
 }
 ''')
 
+
 ############################################################################
 
 if DEV_MODE:
@@ -784,33 +828,6 @@ if DEV_MODE:
                         "I:/Blender Library/00_Parts/00_Intro/00_Inside/002_GuitarTuning.blend")
     mw.update()
 
-############################################################################
-# Setup icons
-
-app_icon = qtg.QIcon()
-
-for size in [16, 24, 32, 48, 64, 128, 256]:
-    path, suffix = ICON.rsplit(".", 1)
-    icon_filename = join(store.working_dir, ICON)
-    filename = join(store.working_dir, f'{path}_{size}x{size}.{suffix}')
-
-    if DEV_MODE:
-        from PIL import Image
-        with Image.open(icon_filename) as img:
-            img.thumbnail((size, size), resample=Image.Resampling.LANCZOS)
-            icc_profile = img.info.get('icc_profile', '')
-
-            img.save(filename,
-                    format='png',
-                    quality=100,
-                    compression='PNG',
-                    icc_profile=icc_profile)
-
-        print(f'Image created: {filename}')
-
-    app_icon.addFile(filename, qtc.QSize(size, size))
-
-app.setWindowIcon(app_icon)
 
 ############################################################################
 # Run

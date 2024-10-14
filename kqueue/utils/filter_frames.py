@@ -6,6 +6,7 @@
 import re
 from numpy import arange, around, isclose
 
+
 def filter_frames(frame_input, increment=1, filter_individual=False):
     """
     Filter frame input & convert it to a set of frames.
