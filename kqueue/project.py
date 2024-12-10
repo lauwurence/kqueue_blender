@@ -1,22 +1,26 @@
 ################################################################################
 ## Project
 
-from . import store
-from .config import *
-
 import PyQt5.QtWidgets as qtw
 import PyQt5.QtGui as qtg
 import PyQt5.QtCore as qtc
 from PyQt5.QtCore import Qt
 
-from os.path import normpath
+from pathlib import Path
+
 from .utils.filter_frames import filter_frames
+from .utils.path import join
+from .config import *
+from . import store
 
 
 ################################################################################
 ## Blend Project Settings
 
 class BlendProject():
+
+    file_format = 'PNG'
+    file_format_override = None
 
     def __init__(self,
                  file,
@@ -28,6 +32,7 @@ class BlendProject():
                  camera_list,
                  use_persistent_data,
                  render_filepath,
+                 file_format,
                  use_adaptive_sampling,
                  samples,
                  denoiser,
@@ -41,7 +46,8 @@ class BlendProject():
         self.camera, self.camera_override = camera, None
         self.camera_list = camera_list
         self.use_persistent_data, self.use_persistent_data_override = use_persistent_data, None
-        self.render_filepath, self.render_filepath_override = normpath(render_filepath), None
+        self.render_filepath, self.render_filepath_override = join(render_filepath), None
+        self.file_format, self.file_format_override = file_format, None
         self.use_adaptive_sampling, self.use_adaptive_sampling_override = use_adaptive_sampling, None
         self.samples, self.samples_override = samples, None
         self.denoiser, self.denoiser_override = denoiser, None
@@ -50,11 +56,48 @@ class BlendProject():
         self.denoising_prefilter, self.denoising_prefilter_override = denoising_prefilter, None
 
     def get_frames(self): return self.get(self.frames_override, self.frames)
-    def get_frames_list(self): return filter_frames(self.get_frames())
+
+    def get_frames_list(self):
+        """
+        """
+
+        format = self.get_file_format()
+
+        if format == 'PNG':
+            ext = '.png'
+        elif format == 'WEBP':
+            ext = '.webp'
+        elif format == 'JPEG':
+            ext = '.jpeg'
+        else:
+            return []
+
+        if store.preset.selective_render:
+            rv = []
+
+            for frame in filter_frames(self.get_frames()):
+                filename = f'{self.get_render_filepath()}{frame:04}{ext}'
+                # basename = filename.rsplit("/", 1)[-1]
+
+                # if "#" in basename:
+                #     zeros = basename.count("#")
+                # else:
+                #     zeros = 4
+
+                if Path(filename).exists():
+                    continue
+
+                rv.append(frame)
+
+            return rv
+
+        return filter_frames(self.get_frames())
+
     def get_scene(self): return self.get(self.scene_override, self.scene)
     def get_camera(self): return self.get(self.camera_override, self.camera)
     def get_use_persistent_data(self): return self.get(self.use_persistent_data_override, self.use_persistent_data)
-    def get_render_filepath(self): return self.get(self.render_filepath_override, self.render_filepath)
+    def get_render_filepath(self): return join(self.get(self.render_filepath_override, self.render_filepath))
+    def get_file_format(self): return self.get(self.file_format_override, self.file_format)
     def get_use_adaptive_sampling(self): return self.get(self.use_adaptive_sampling_override, self.use_adaptive_sampling)
     def get_samples(self): return self.get(self.samples_override, self.samples)
     def get_denoiser(self): return self.get(self.denoiser_override, self.denoiser)
@@ -95,7 +138,7 @@ class BlendProjectWindow(qtw.QWidget):
 
         # [label] Settings
         font = qtg.QFont()
-        font.setPixelSize(15)
+        font.setPixelSize(18)
 
         self.label = qtw.QLabel(str(project.file))
         self.label.setFont(font)
@@ -141,12 +184,18 @@ class BlendProjectWindow(qtw.QWidget):
         def locate_filepath():
             filepath, _ = qtw.QFileDialog.getSaveFileName(self, 'Set Render Filepath', w_renderFilepath.text())
             if not filepath: return
-            w_renderFilepath.setText(normpath(filepath))
+            w_renderFilepath.setText(join(filepath))
         w_locateFilepath = qtw.QPushButton("", clicked=locate_filepath)
         w_locateFilepath.clicked.connect(lambda: self.update())
-        w_locateFilepath.setIcon(qtg.QIcon('kqueue/icons/load.svg'))
+        w_locateFilepath.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
         w_locateFilepath.setFixedWidth(30)
         w_hBoxLayoutRenderFilepath.addWidget(w_locateFilepath)
+
+        # [edit] File Format
+        self.w_fileFormat = w_fileFormat = qtw.QComboBox()
+        w_fileFormat.addItems(['PNG', 'JPEG', 'JPEG2000', 'WEBP', 'TIFF'])
+        w_fileFormat.setCurrentText(str(project.get_file_format()))
+        l_form.addRow("File Format", w_fileFormat)
 
         # [edit] Camera
         self.w_camera = w_camera = qtw.QComboBox()

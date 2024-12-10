@@ -1,15 +1,14 @@
 ################################################################################
 ## Queue Preset
 
-import re
-import io
 import time
 import subprocess
 import PyQt5.QtCore as qtc
 
+from re import search
+from io import TextIOWrapper
 from pathlib import Path
-from os.path import normpath, join
-
+from .utils.path import join
 from .utils import monitor, audio
 from .config import *
 from . import store
@@ -44,11 +43,37 @@ class RenderWorker(qtc.QThread):
             fl = project.get_frames_list()
             ca = project.get_camera()
 
-            if ca is None:
+            if not sc or not fl or not ca:
                 continue
 
-            PYTOH_FILE = normpath(join(store.working_dir, f'blender/temp/render_settings.py'))
-            PYTHON = f"""
+            PYTOH_FILE = join(store.working_dir, "blender/temp/render_settings.py")
+
+            if preset.preview_render:
+                PYTHON = f"""
+import bpy
+
+scene = bpy.context.scene
+render = scene.render
+shading = scene.display.shading
+
+scene.camera = bpy.data.objects['{ca}']
+render.filepath = "{project.get_render_filepath().replace('\\', '/')}"
+
+render.use_overwrite = True
+render.compositor_device = 'GPU'
+render.use_simplify = True
+render.simplify_subdivision_render = 0
+
+shading.color_type = 'TEXTURE'
+shading.show_cavity = True
+shading.use_dof = True
+shading.show_object_outline = True
+shading.show_backface_culling = False
+shading.show_shadows = False
+"""
+
+            else:
+                PYTHON = f"""
 import bpy
 
 scene = bpy.context.scene
@@ -56,41 +81,48 @@ cycles = scene.cycles
 render = scene.render
 
 render.use_overwrite = True
-scene.camera = bpy.data.objects["{ca}"]
+render.compositor_device = 'GPU'
+
+scene.camera = bpy.data.objects['{ca}']
 render.use_persistent_data = {project.get_use_persistent_data()}
-render.filepath = "{project.get_render_filepath().replace("\\", "/")}"
+render.filepath = "{project.get_render_filepath().replace('\\', '/')}"
 cycles.use_adaptive_sampling = {project.get_use_adaptive_sampling()}
 cycles.samples = {project.get_samples()}
-cycles.denoiser = "{project.get_denoiser()}"
+cycles.denoiser = '{project.get_denoiser()}'
 cycles.denoising_use_gpu = {project.get_denoising_use_gpu()}
-cycles.denoising_input_passes = "{project.get_denoising_input_passes()}"
-cycles.denoising_prefilter = "{project.get_denoising_prefilter()}"
+cycles.denoising_input_passes = '{project.get_denoising_input_passes()}'
+cycles.denoising_prefilter = '{project.get_denoising_prefilter()}'
 """
 
-            with open(PYTOH_FILE, 'w') as f:
-                f.write(PYTHON)
+            # Assign sRGB if needed
+            if preset.assign_srgb:
+                PYTHON += "\nscene.display_settings.display_device = 'sRGB'"
 
-            BATCH_FILE = normpath(join(store.working_dir, f'blender/temp/start_render.bat'))
+            with open(PYTOH_FILE, 'w', encoding="utf-8") as f:
+                f.write(PYTHON.strip())
+
+            BATCH_FILE = join(store.working_dir, f'blender/temp/start_render.bat')
             BATCH = f"""
 @CHCP 65001 > NUL
 @echo ---START-RENDER
-blender --background "{project.file}" --scene "{sc}" -E "CYCLES" --python "{PYTOH_FILE}" -f "{",".join([str(f) for f in fl])}"
+blender --background "{project.file}" --scene "{sc}" -E "{'CYCLES' if not preset.preview_render else 'BLENDER_WORKBENCH'}" --python "{PYTOH_FILE}" -f "{",".join([str(f) for f in fl])}"
 @echo ---END-RENDER
-""".strip()
+"""
 
-            with open(BATCH_FILE, 'w') as f:
-                f.write(BATCH)
+            with open(BATCH_FILE, 'w', encoding="utf-8") as f:
+                f.write(BATCH.strip())
 
-            preset.process = subprocess.Popen([BATCH_FILE],
-                                    stderr=subprocess.STDOUT,
-                                    stdout=subprocess.PIPE,
-                                    stdin=subprocess.PIPE,
-                                    cwd=normpath(Path(preset.blender_exe).parent),
-                                    #    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, #DETACHED_PROCESS
-                                    creationflags=subprocess.CREATE_NO_WINDOW,
-                                    #    preexec_fn=os.setsid,
-                                    shell=False
-                                    )
+            preset.process = subprocess.Popen(
+                [ BATCH_FILE ],
+                stderr=subprocess.STDOUT,
+                stdout=subprocess.PIPE,
+                stdin=subprocess.PIPE,
+                cwd=join(Path(preset.blender_exe).parent),
+                #    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, #DETACHED_PROCESS
+                creationflags=subprocess.CREATE_NO_WINDOW,
+                #    preexec_fn=os.setsid,
+                shell=False
+                )
 
             if not self.listener_started:
                 self.listener_started = True
@@ -171,7 +203,7 @@ class RenderListenWorker(qtc.QThread):
                 if not preset.process:
                     break
 
-                for line in io.TextIOWrapper(preset.process.stdout, encoding="utf-8"):
+                for line in TextIOWrapper(preset.process.stdout, encoding='utf-8'):
                     log(line)
 
                     current_time = time.time()
@@ -193,13 +225,13 @@ class RenderListenWorker(qtc.QThread):
 
                     # if not eta_time:
                     #     # Local progress <100%
-                    #     found = re.search(r'Rendered (\d+)/(\d+) Tiles, Sample (\d+)/(\d+)', line)
+                    #     found = search(r'Rendered (\d+)/(\d+) Tiles, Sample (\d+)/(\d+)', line)
                     #     if found:
 
                     self.gProgressETA_setText.emit(f'Elapsed: {h:02.0f}:{m:02.0f}:{s:02.0f} | AVG: {avg_h:02.0f}:{avg_m:02.0f}:{avg_s:02.0f} | ETA: {eta_h:02.0f}:{eta_m:02.0f}:{eta_s:02.0f}')
 
                     # Change project
-                    found = re.search(r'--background ["](.*?.blend)["].*?-f ["](.*?)["]', line)
+                    found = search(r'--background ["](.*?.blend)["].*?-f ["](.*?)["]', line)
                     if found:
                         file = found.group(1)
                         frames = found.group(2)
@@ -231,7 +263,7 @@ QListWidget {
     color: rgb(25, 25, 25);
     border-radius: 6px;
     padding: 2px;
-    font-size: 15px;
+    font-size: 12px;
 }
 """)
                                 done = True
@@ -242,7 +274,7 @@ QListWidget {
                         continue
 
                     # Local progress <100%
-                    found = re.search(r'Rendered (\d+)/(\d+) Tiles, Sample (\d+)/(\d+)', line)
+                    found = search(r'Rendered (\d+)/(\d+) Tiles, Sample (\d+)/(\d+)', line)
                     if found:
                         tile = int(found.group(1))
                         tiles = int(found.group(2))
@@ -255,7 +287,7 @@ QListWidget {
                         continue
 
                     # Progress 100%
-                    found = re.search(r'Saved: [\'|"](.*?)[\'|"]', line)
+                    found = search(r'Saved: [\'|"](.*?)[\'|"]', line)
                     if found:
                         file = found.group(1)
                         preset.renders_list.append(file)
@@ -267,10 +299,12 @@ QListWidget {
                         self.gProgress_setText.emit(f'{preset.global_frame}/{preset.global_frames}')
                         self.pProgress_setText.emit(f'{preset.project_frame}/{preset.project_frames}')
 
+                        self.mw_update.emit()
+
                         continue
 
                     # Progress
-                    found = re.search(r'Fra:(\d+) Mem', line)
+                    found = search(r'Fra:(\d+) Mem', line)
                     if found:
                         fra = int(found.group(1))
                         preset.frame_flag = fra
@@ -293,7 +327,7 @@ QListWidget {
                 if not preset.process:
                     break
 
-                for line in io.TextIOWrapper(preset.process.stdin, encoding="utf-8"):
+                for line in TextIOWrapper(preset.process.stdin, encoding='utf-8'):
                     log(line)
 
             except Exception as e:
@@ -301,13 +335,15 @@ QListWidget {
 
 
         if preset.is_status('RENDERING_FINISHED'):
-            print(preset.global_frame)
             self.gProgress_setText.emit(f'{preset.global_frame}/{preset.global_frames}')
             self.pProgress_setText.emit(f'{preset.project_frame}/{preset.project_frames}')
             self.gProgressBar_setValue.emit(100)
             self.rProgressBar_setValue.emit(100)
+
             audio.play(RENDER_FINISH_AUDIO)
             log("Rendering finished.")
+
+            preset.shutdown()
 
         elif preset.is_status('RENDERING_STOPPING'):
             audio.play(RENDER_STOP_AUDIO)
@@ -323,7 +359,7 @@ QListWidget {
     color: rgb(25, 25, 25);
     border-radius: 6px;
     padding: 2px;
-    font-size: 15px;
+    font-size: 12px;
 }
 """)
 

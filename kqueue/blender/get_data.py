@@ -29,6 +29,7 @@ def main():
             'camera' : 'scene.camera.name if scene.camera else None',
             'camera_list' : '[obj.name for obj in bpy.data.objects if obj.type == "CAMERA"]',
             'render_filepath' : 'render.filepath',
+            'file_format' : 'render.image_settings.file_format',
             'use_persistent_data' : 'render.use_persistent_data',
             'use_adaptive_sampling' : 'cycles.use_adaptive_sampling',
             'samples' : 'cycles.samples',
@@ -45,10 +46,10 @@ def main():
 
         raise Exception("Error fetching data.")
 
-    with open(DATA_FILE, 'w') as json_file:
+    with open(DATA_FILE, 'w') as json_file: #encoding="utf-8"
         json_file.write(json.dumps(data, indent=4))
 
-    print("Data fetched without errors.")
+    print("Data fetched successfully.")
 
 main()
 

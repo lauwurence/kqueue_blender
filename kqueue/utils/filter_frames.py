@@ -1,10 +1,38 @@
 ################################################################################
 ## Filter Frames
 
-# Taken from: https://github.com/p2or/blender-loom
-
-import re
+from re import compile, VERBOSE
 from numpy import arange, around, isclose
+
+rx_filter = compile(r"""
+[\^\!]? \s*?                                                                    # Exclude option
+[-+]?                                                                           # Negative or positive number
+(?:
+    # Range & increment 1-2x2, 0.0-0.1x.02
+    (?: \d* \.? \d+ \s? \- \s? \d* \.? \d+ \s? [x%] \s? [-+]? \d* \.? \d+ )
+    |
+    # Range 1-2, 0.0-0.1 etc
+    (?: \d* \.? \d+ \s? \- \s? [-+]? \d* \.? \d+ )
+    |
+    # .1 .12 .123 etc 9.1 etc 98.1 etc
+    (?: \d* \. \d+ )
+    |
+    # 1. 12. 123. etc 1 12 123 etc
+    (?: \d+ \.? )
+)
+""", VERBOSE)
+
+rx_group = compile(r"""
+([-+]? \d*? \.? [0-9]+ \b)                                                      # Start frame
+(\s*? \- \s*?)                                                                  # Minus
+([-+]? \d* \.? [0-9]+)                                                          # End frame
+( (\s*? [x%] \s*? )( [-+]? \d* \.? [0-9]+ \b ) )?                               # Increment
+""", VERBOSE)
+
+rx_exclude = compile(r"""
+[\^\!] \s*?                                                                     # Exclude option
+([-+]? \d* \.? \d+)$                                                            # Int or Float
+""", VERBOSE)
 
 
 def filter_frames(frame_input, increment=1, filter_individual=False):
@@ -23,37 +51,6 @@ def filter_frames(frame_input, increment=1, filter_individual=False):
         except ValueError:
             return None
 
-    numeric_pattern = r"""
-        [\^\!]? \s*? # Exclude option
-        [-+]?        # Negative or positive number
-        (?:
-            # Range & increment 1-2x2, 0.0-0.1x.02
-            (?: \d* \.? \d+ \s? \- \s? \d* \.? \d+ \s? [x%] \s? [-+]? \d* \.? \d+ )
-            |
-            # Range 1-2, 0.0-0.1 etc
-            (?: \d* \.? \d+ \s? \- \s? [-+]? \d* \.? \d+ )
-            |
-            # .1 .12 .123 etc 9.1 etc 98.1 etc
-            (?: \d* \. \d+ )
-            |
-            # 1. 12. 123. etc 1 12 123 etc
-            (?: \d+ \.? )
-        )
-        """
-    range_pattern = r"""
-        ([-+]? \d*? \.? [0-9]+ \b) # Start frame
-        (\s*? \- \s*?)             # Minus
-        ([-+]? \d* \.? [0-9]+)     # End frame
-        ( (\s*? [x%] \s*? )( [-+]? \d* \.? [0-9]+ \b ) )? # Increment
-        """
-    exclude_pattern = r"""
-        [\^\!] \s*?             # Exclude option
-        ([-+]? \d* \.? \d+)$    # Int or Float
-        """
-
-    rx_filter = re.compile(numeric_pattern, re.VERBOSE)
-    rx_group = re.compile(range_pattern, re.VERBOSE)
-    rx_exclude = re.compile(exclude_pattern, re.VERBOSE)
 
     input_filtered = rx_filter.findall(frame_input)
     if not input_filtered: return None
