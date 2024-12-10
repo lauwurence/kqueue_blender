@@ -6,6 +6,7 @@ __pycache__/
 temp/
 old/
 saves/
+.vscode/
 
 # Extensions
 *.psd
