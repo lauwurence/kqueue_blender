@@ -7,6 +7,7 @@ Queue your Blender render projects and override settings.
 1. Save and load kQueue project files.
 2. Fetch and cache Blender project data.
 3. Render specific frame ranges, override render settings.
+4. Open last rendered frame or path.
 5. Turn screens off.
 6. Shutdown PC on complete.
 7. (TODO:) Render frames that were not rendered.
