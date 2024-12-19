@@ -11,12 +11,12 @@ from pathlib import Path
 from .utils.path import join
 from .utils import monitor, audio
 from .config import *
-from . import store
+from . import store, main
 
 
 ################################################################################
 
-class RenderWorker(qtc.QThread):
+class RenderThread(qtc.QThread):
 
     finished = qtc.pyqtSignal()
     listener_started = False
@@ -32,9 +32,12 @@ class RenderWorker(qtc.QThread):
 
         audio.play(RENDER_START_AUDIO)
         preset.set_status('RENDERING')
-        mw.update()
+        mw.update_widgets.emit()
 
         for project in preset.project_list:
+
+            if not project.active:
+                continue
 
             if preset.is_status('RENDERING_STOPPING', 'RENDERING_FINISHED'):
                 break
@@ -56,20 +59,24 @@ scene = bpy.context.scene
 render = scene.render
 shading = scene.display.shading
 
-scene.camera = bpy.data.objects['{ca}']
+# Output
+scene.camera = bpy.data.objects["{ca}"]
 render.filepath = "{project.get_render_filepath().replace('\\', '/')}"
-
 render.use_overwrite = True
-render.compositor_device = 'GPU'
 render.use_simplify = True
 render.simplify_subdivision_render = 0
 
-shading.color_type = 'TEXTURE'
+# Render
+shading.color_type = "TEXTURE"
 shading.show_cavity = True
 shading.use_dof = True
 shading.show_object_outline = True
 shading.show_backface_culling = False
 shading.show_shadows = False
+
+# Compositor
+render.compositor_device = "GPU"
+render.compositor_precision = "FULL"
 """
 
             else:
@@ -80,18 +87,27 @@ scene = bpy.context.scene
 cycles = scene.cycles
 render = scene.render
 
-render.use_overwrite = True
-render.compositor_device = 'GPU'
-
-scene.camera = bpy.data.objects['{ca}']
+# Output
+scene.camera = bpy.data.objects["{ca}"]
 render.use_persistent_data = {project.get_use_persistent_data()}
 render.filepath = "{project.get_render_filepath().replace('\\', '/')}"
+render.use_overwrite = True
+render.use_simplify = False
+
+# Render
 cycles.use_adaptive_sampling = {project.get_use_adaptive_sampling()}
 cycles.samples = {project.get_samples()}
-cycles.denoiser = '{project.get_denoiser()}'
+
+# Denoiser
+cycles.denoiser = "{project.get_denoiser()}"
+cycles.denoising_input_passes = "{project.get_denoising_input_passes()}"
+cycles.denoising_prefilter = "{project.get_denoising_prefilter()}"
+cycles.denoising_quality = "HIGH"
 cycles.denoising_use_gpu = {project.get_denoising_use_gpu()}
-cycles.denoising_input_passes = '{project.get_denoising_input_passes()}'
-cycles.denoising_prefilter = '{project.get_denoising_prefilter()}'
+
+# Compositor
+render.compositor_device = "GPU"
+render.compositor_precision = "FULL"
 """
 
             # Assign sRGB if needed
@@ -104,10 +120,12 @@ cycles.denoising_prefilter = '{project.get_denoising_prefilter()}'
             BATCH_FILE = join(store.working_dir, f'blender/temp/start_render.bat')
             BATCH = f"""
 @CHCP 65001 > NUL
-@echo ---START-RENDER
+@echo ---BLENDER-RENDER-START
 blender --background "{project.file}" --scene "{sc}" -E "{'CYCLES' if not preset.preview_render else 'BLENDER_WORKBENCH'}" --python "{PYTOH_FILE}" -f "{",".join([str(f) for f in fl])}"
-@echo ---END-RENDER
+@echo ---BLENDER-RENDER-END
 """
+
+#--cycles-device OPTIX
 
             with open(BATCH_FILE, 'w', encoding="utf-8") as f:
                 f.write(BATCH.strip())
@@ -127,29 +145,30 @@ blender --background "{project.file}" --scene "{sc}" -E "{'CYCLES' if not preset
             if not self.listener_started:
                 self.listener_started = True
 
-                self.listen_thread = qtc.QThread()
-                self.listen_worker = RenderListenWorker()
-                self.listen_worker.moveToThread(self.listen_thread)
 
-                self.listen_worker.gProgressBar_setValue.connect(mw.w_gProgressBar.setValue)
-                self.listen_worker.gProgress_setText.connect(mw.w_gProgress.setText)
+                self.listen_thread = RenderListenThread()
 
-                self.listen_worker.pProgressBar_setValue.connect(mw.w_pProgressBar.setValue)
-                self.listen_worker.pProgress_setText.connect(mw.w_pProgress.setText)
+                # self.listen_thread = qtc.QThread()
+                # self.listen_worker = RenderListenThread()
+                # self.listen_worker.moveToThread(self.listen_thread)
 
-                self.listen_worker.rProgressBar_setValue.connect(mw.w_rProgressBar.setValue)
-                self.listen_worker.gProgressETA_setText.connect(mw.w_gProgressETA.setText)
+                self.listen_thread.gProgressBar_setValue.connect(mw.w_gProgressBar.setValue)
+                self.listen_thread.gProgress_setText.connect(mw.w_gProgress.setText)
 
-                self.listen_worker.listOfProjects_setCurrentItem.connect(mw.w_listOfProjects.setCurrentItem)
-                self.listen_worker.listOfProjects_setStyleSheet.connect(mw.w_listOfProjects.setStyleSheet)
+                self.listen_thread.pProgressBar_setValue.connect(mw.w_pProgressBar.setValue)
+                self.listen_thread.pProgress_setText.connect(mw.w_pProgress.setText)
 
-                self.listen_thread.started.connect(self.listen_worker.run)
-                self.listen_worker.finished.connect(self.listen_thread.quit)
+                self.listen_thread.rProgressBar_setValue.connect(mw.w_rProgressBar.setValue)
+                self.listen_thread.gProgressETA_setText.connect(mw.w_gProgressETA.setText)
 
-                self.listen_worker.finished.connect(self.listen_worker.deleteLater)
-                self.listen_thread.finished.connect(self.listen_thread.deleteLater)
-                self.listen_worker.mw_update.connect(mw.update)
-                self.listen_worker.mw_log.connect(mw.log)
+                self.listen_thread.listOfProjects_setCurrentItem.connect(mw.w_listOfProjects.setCurrentItem)
+                self.listen_thread.listOfProjects_setStyleSheet.connect(mw.w_listOfProjects.setStyleSheet)
+
+                # self.listen_thread.started.connect(self.listen_worker.run)
+                # self.listen_worker.finished.connect(self.listen_thread.quit)
+
+                # self.listen_worker.finished.connect(self.listen_worker.deleteLater)
+                # self.listen_thread.finished.connect(self.listen_thread.deleteLater)
 
                 self.listen_thread.start()
 
@@ -163,11 +182,9 @@ blender --background "{project.file}" --scene "{sc}" -E "{'CYCLES' if not preset
 
 ################################################################################
 
-class RenderListenWorker(qtc.QThread):
+class RenderListenThread(qtc.QThread):
 
     finished = qtc.pyqtSignal()
-    mw_update = qtc.pyqtSignal()
-    mw_log = qtc.pyqtSignal(str)
 
     gProgressBar_setValue = qtc.pyqtSignal(int)
     gProgress_setText = qtc.pyqtSignal(str)
@@ -192,7 +209,7 @@ class RenderListenWorker(qtc.QThread):
         """
         preset = store.preset
         mw = store.mw
-        log = self.mw_log.emit
+        log = main.log
 
         while True:
 
@@ -219,7 +236,7 @@ class RenderListenWorker(qtc.QThread):
                     avg_h, avg_m = divmod(avg_m, 60)
 
                     # Estimated time
-                    eta_time = avg_time * (preset.global_frames + 1 - preset.global_frame)
+                    eta_time = avg_time * (preset.get_global_frames_number() + 1 - preset.global_frame)
                     eta_m, eta_s = divmod(eta_time, 60)
                     eta_h, eta_m = divmod(eta_m, 60)
 
@@ -239,37 +256,33 @@ class RenderListenWorker(qtc.QThread):
                         preset.project_frame = 0
                         preset.project_frames = len(frames.split(','))
 
-                        done = False
-
                         for i in range(mw.w_listOfProjects.count()):
                             item = mw.w_listOfProjects.item(i)
+                            w_project = mw.w_listOfProjects.itemWidget(item)
 
-                            if file == item.text().split(".blend")[0] + ".blend":
-                                self.listOfProjects_setCurrentItem.emit(item)
+                            if file.strip() != w_project.project.file.strip():
+                                continue
 
-                                # Updates the widget (default `update` does not work!)
-                                self.listOfProjects_setStyleSheet.emit("""
-QListView::item:selected {
-    color: rgb(25, 25, 25);
-    background-color: rgb(255, 255, 255);
-    border: 1px solid #e87d0d;
-    border-radius: 4px;
-}
-QListView::item {
-    color: rgb(125, 125, 125);
-}
-QListWidget {
-    background-color: rgb(225, 225, 225);
-    color: rgb(25, 25, 25);
-    border-radius: 6px;
-    padding: 2px;
-    font-size: 12px;
-}
-""")
-                                done = True
-                                break
-
-                            if done: break
+                            self.listOfProjects_setCurrentItem.emit(item)
+                            self.listOfProjects_setStyleSheet.emit("""
+                                QListView::item:selected {
+                                    color: rgb(25, 25, 25);
+                                    background-color: rgb(255, 255, 255);
+                                    border: 1px solid #e87d0d;
+                                    border-radius: 4px;
+                                }
+                                QListView::item {
+                                    color: rgb(125, 125, 125);
+                                }
+                                QListWidget {
+                                    background-color: rgb(225, 225, 225);
+                                    color: rgb(25, 25, 25);
+                                    border-radius: 6px;
+                                    padding: 2px;
+                                    font-size: 12px;
+                                }
+                            """)
+                            break
 
                         continue
 
@@ -299,7 +312,7 @@ QListWidget {
                         self.gProgress_setText.emit(f'{preset.global_frame}/{preset.global_frames}')
                         self.pProgress_setText.emit(f'{preset.project_frame}/{preset.project_frames}')
 
-                        self.mw_update.emit()
+                        mw.update_widgets.emit()
 
                         continue
 
@@ -354,16 +367,16 @@ QListWidget {
 
         preset.set_status('READY_TO_RENDER')
         self.listOfProjects_setStyleSheet.emit("""
-QListWidget {
-    background-color: rgb(255, 255, 255);
-    color: rgb(25, 25, 25);
-    border-radius: 6px;
-    padding: 2px;
-    font-size: 12px;
-}
-""")
+            QListWidget {
+                background-color: rgb(255, 255, 255);
+                color: rgb(25, 25, 25);
+                border-radius: 6px;
+                padding: 2px;
+                font-size: 12px;
+            }
+        """)
 
         monitor.screen_on()
 
-        self.mw_update.emit()
+        mw.update_widgets.emit()
         self.finished.emit()

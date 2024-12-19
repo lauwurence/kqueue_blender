@@ -1,121 +1,107 @@
 ################################################################################
-## Project
+## Project Widgets
 
 import PyQt5.QtWidgets as qtw
 import PyQt5.QtGui as qtg
 import PyQt5.QtCore as qtc
 from PyQt5.QtCore import Qt
 
-from pathlib import Path
-
-from .utils.filter_frames import filter_frames
-from .utils.path import join
-from .config import *
-from . import store
+from ..utils.path import join
+from ..config import *
+from .. import store
 
 
 ################################################################################
-## Blend Project Settings
+## Project Item Widget
 
-class BlendProject():
+class QBlendProject(qtw.QWidget):
 
-    file_format = 'PNG'
-    file_format_override = None
+    def __init__ (self, project, parent=None):
+        super(QBlendProject, self).__init__(parent)
 
-    def __init__(self,
-                 file,
-                 frame_start,
-                 frame_end,
-                 scene,
-                 scene_list,
-                 camera,
-                 camera_list,
-                 use_persistent_data,
-                 render_filepath,
-                 file_format,
-                 use_adaptive_sampling,
-                 samples,
-                 denoiser,
-                 denoising_use_gpu,
-                 denoising_input_passes,
-                 denoising_prefilter,):
-        self.file = file if file else None
-        self.frames, self.frames_override = f"{frame_start}-{frame_end}", None
-        self.scene, self.scene_override = scene, None
-        self.scene_list = scene_list
-        self.camera, self.camera_override = camera, None
-        self.camera_list = camera_list
-        self.use_persistent_data, self.use_persistent_data_override = use_persistent_data, None
-        self.render_filepath, self.render_filepath_override = join(render_filepath), None
-        self.file_format, self.file_format_override = file_format, None
-        self.use_adaptive_sampling, self.use_adaptive_sampling_override = use_adaptive_sampling, None
-        self.samples, self.samples_override = samples, None
-        self.denoiser, self.denoiser_override = denoiser, None
-        self.denoising_use_gpu, self.denoising_use_gpu_override = denoising_use_gpu, None
-        self.denoising_input_passes, self.denoising_input_passes_override = denoising_input_passes, None
-        self.denoising_prefilter, self.denoising_prefilter_override = denoising_prefilter, None
+        self.project = project
 
-    def get_frames(self): return self.get(self.frames_override, self.frames)
+        # [vbox]
+        self.w_vBoxLayout = qtw.QVBoxLayout()
+        self.setLayout(self.w_vBoxLayout)
 
-    def get_frames_list(self):
-        """
-        """
+        if True:
 
-        format = self.get_file_format()
+            # [hbox]
+            self.w_hBoxLayout = qtw.QHBoxLayout()
+            self.w_vBoxLayout.addLayout(self.w_hBoxLayout)
 
-        if format == 'PNG':
-            ext = '.png'
-        elif format == 'WEBP':
-            ext = '.webp'
-        elif format == 'JPEG':
-            ext = '.jpeg'
-        else:
-            return []
+            # [check] Active
+            self.w_active = qtw.QCheckBox()
+            self.w_hBoxLayout.addWidget(self.w_active)
 
-        if store.preset.selective_render:
-            rv = []
+            def toggle_active():
+                project.active = self.w_active.isChecked()
+                store.mw.update_list.emit(False)
+                store.mw.update_widgets.emit()
 
-            for frame in filter_frames(self.get_frames()):
-                filename = f'{self.get_render_filepath()}{frame:04}{ext}'
-                # basename = filename.rsplit("/", 1)[-1]
+            self.w_active.clicked.connect(lambda: toggle_active())
+            self.w_active.setStyleSheet("""
+                QCheckBox::indicator {
+                    width : 12;
+                    height : 12;
+                }
+            """)
 
-                # if "#" in basename:
-                #     zeros = basename.count("#")
-                # else:
-                #     zeros = 4
+            # [label] Blend Filename
+            self.w_filename = qtw.QLabel()
+            self.w_hBoxLayout.addWidget(self.w_filename, Qt.AlignLeft)
 
-                if Path(filename).exists():
-                    continue
+        if True:
 
-                rv.append(frame)
+            # [hbox]
+            self.w_hBoxLayout = qtw.QHBoxLayout()
+            self.w_vBoxLayout.addLayout(self.w_hBoxLayout)
 
-            return rv
+            # [label]
+            self.w_frames = qtw.QLabel()
+            self.w_hBoxLayout.addWidget(self.w_frames)
 
-        return filter_frames(self.get_frames())
+            # [label]
+            self.w_samples = qtw.QLabel()
+            self.w_hBoxLayout.addWidget(self.w_samples)
 
-    def get_scene(self): return self.get(self.scene_override, self.scene)
-    def get_camera(self): return self.get(self.camera_override, self.camera)
-    def get_use_persistent_data(self): return self.get(self.use_persistent_data_override, self.use_persistent_data)
-    def get_render_filepath(self): return join(self.get(self.render_filepath_override, self.render_filepath))
-    def get_file_format(self): return self.get(self.file_format_override, self.file_format)
-    def get_use_adaptive_sampling(self): return self.get(self.use_adaptive_sampling_override, self.use_adaptive_sampling)
-    def get_samples(self): return self.get(self.samples_override, self.samples)
-    def get_denoiser(self): return self.get(self.denoiser_override, self.denoiser)
-    def get_denoising_use_gpu(self): return self.get(self.denoising_use_gpu_override, self.denoising_use_gpu)
-    def get_denoising_input_passes(self): return self.get(self.denoising_input_passes_override, self.denoising_input_passes)
-    def get_denoising_prefilter(self): return self.get(self.denoising_prefilter_override, self.denoising_prefilter)
+            # [label]
+            self.w_camera = qtw.QLabel()
+            self.w_hBoxLayout.addWidget(self.w_camera)
 
-    def get(self, v1, v2):
-        if v1 is None:
-            return v2
-        else:
-            return v1
+            # [label] Render Filepath
+            self.w_render_filepath = qtw.QLabel()
+            self.w_hBoxLayout.addWidget(self.w_render_filepath, Qt.AlignLeft)
+
+
+    def set_filename(self, filename):
+        self.w_filename.setText(filename)
+
+    def get_filename(self):
+        return self.w_filename.text() or None
+
+    def set_active(self, value: bool):
+        self.w_active.setChecked(value)
+
+    def set_frames(self, frames):
+        self.w_frames.setText(f'Frames: [{frames}]')
+
+    def set_samples(self, samples):
+        self.w_samples.setText(f'| Samples: {samples}')
+
+    def set_camera(self, camera):
+        self.w_camera.setText(f'| Camera: "{camera}"')
+
+    def set_render_filepath(self, filepath):
+        self.w_render_filepath.setText(f'| Output: "{filepath}"')
+
 
 
 ################################################################################
 ## Project Settings Window
 
-class BlendProjectWindow(qtw.QWidget):
+class QBlendProjectSettings(qtw.QWidget):
 
     wResult_setText = qtc.pyqtSignal(str)
 
@@ -186,7 +172,7 @@ class BlendProjectWindow(qtw.QWidget):
             if not filepath: return
             w_renderFilepath.setText(join(filepath))
         w_locateFilepath = qtw.QPushButton("", clicked=locate_filepath)
-        w_locateFilepath.clicked.connect(lambda: self.update())
+        w_locateFilepath.clicked.connect(lambda: store.mw.update_widgets.emit())
         w_locateFilepath.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
         w_locateFilepath.setFixedWidth(30)
         w_hBoxLayoutRenderFilepath.addWidget(w_locateFilepath)
@@ -281,22 +267,23 @@ class BlendProjectWindow(qtw.QWidget):
         """
 
         self.wResult_setText.emit(f'{self.project.get_frames_list()}')
-        print(f'{self.project.get_frames_list()}')
-
+        # print(f'{self.project.get_frames_list()}')
         # self.w_result.setText(f'{self.project.get_frames_list()}')
 
 
     def save_and_close(self):
         """
+        Save values and close this window.
         """
 
         self.save()
         self.close()
-        store.mw.update_list()
+        store.mw.update_list.emit(False)
 
 
     def save(self):
         """
+        Save values and set need save if something changed.
         """
 
         def set_value(variable, value):

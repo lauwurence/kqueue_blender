@@ -1,7 +1,6 @@
 ################################################################################
 ## Main
 
-import json
 import subprocess
 
 import PyQt5.QtWidgets as qtw
@@ -19,8 +18,10 @@ from ctypes import windll
 
 from .utils import monitor
 from .utils.path import join, open_folder, open_image
-from .project import BlendProject, BlendProjectWindow
-from .render import RenderWorker
+from .project.widgets import QBlendProject, QBlendProjectSettings
+
+from .render import RenderThread
+from .loader import LoaderThread
 from .config import *
 from . import store
 
@@ -32,18 +33,28 @@ if hasattr(Qt, 'AA_UseHighDpiPixmaps'):
 
 ################################################################################
 
-DEV_MODE = False
 store.working_dir = join(getcwd() + "/kqueue")
 
 
 ################################################################################
 
+# class GlobalPreset():
+
+#     def __init__(self):
+
+#         # Filename of the current preset.
+#         self.filename = None
+
+#         # Path to Blender executable.
+#         self.blender_exe = None
+
+
 class QueuePreset():
 
     def __init__(self):
 
-        # Loaded save filename.
-        self.loaded_save = None
+        # Filename of this preset.
+        self.filename = None
 
         # Path to Blender executable.
         self.blender_exe = None
@@ -78,6 +89,13 @@ class QueuePreset():
         self.init_render_variables()
 
 
+    def get_global_frames_number(self):
+        """
+        Get total frames number.
+        """
+        return sum([ len(p.get_frames_list()) for p in self.project_list if p.active ])
+
+
     def need_save(self, value=True):
         """
         Does the project need saving?
@@ -100,10 +118,10 @@ class QueuePreset():
         self.global_render_start_time = time()
         self.render_start_time = time()
         self.render_avg_time = set()
+        self.global_frames = sum([ len(p.get_frames_list()) for p in self.project_list if p.active ])
         self.global_frame = 0
-        self.global_frames = 0
-        self.project_frame = 0
         self.project_frames = 0
+        self.project_frame = 0
         self.renders_list = []
 
         self.frame_flag = 0
@@ -158,6 +176,11 @@ class QueuePreset():
         Set current Blender executable.
         """
 
+        if not Path(filename).exists():
+            self.blender_exe = None
+            mw.w_pathToBlender.setText("Locate blender.exe first!")
+            return
+
         if filename == self.blender_exe:
             return
 
@@ -173,16 +196,19 @@ class QueuePreset():
         Save project state as a file.
         """
 
-        path = join(store.working_dir, SAVE_FOLDER)
-        makedirs(path, exist_ok=True)
+        if self.filename and False:
+            path = self.filename
+        else:
+            path = join(store.working_dir, SAVE_FOLDER)
+            makedirs(path, exist_ok=True)
 
         filename, _ = qtw.QFileDialog.getSaveFileName(mw, 'Save', path, "kQueue Project (*.kqp)")
 
         if not filename:
             return
 
-        from .save_load import save
-        save([self.project_list, self.blender_exe], filename, version=1)
+        from .save_load import save_file
+        save_file([self.project_list, self.blender_exe], filename, version=1)
 
         self.set_save(filename)
         self.need_save(False)
@@ -193,16 +219,22 @@ class QueuePreset():
         Load save from...
         """
 
-        path = join(store.working_dir, SAVE_FOLDER)
-        makedirs(path, exist_ok=True)
+        if self.filename and False:
+            path = self.filename
+        else:
+            path = join(store.working_dir, SAVE_FOLDER)
+            makedirs(path, exist_ok=True)
 
         filename, _ = qtw.QFileDialog.getOpenFileName(mw, 'Load', path, "kQueue Project (*.kqp)")
 
         if not filename:
             return
 
-        from .save_load import load
-        version, data = load(filename)
+        from .save_load import load_file
+        version, data = load_file(filename)
+
+        if not data:
+            return
 
         if version == 1:
             self.project_list, blender_exe = data
@@ -211,7 +243,7 @@ class QueuePreset():
         self.set_save(filename)
         self.need_save(False)
 
-        mw.update_list()
+        mw.update_list.emit(False)
 
 
     def set_save(self, filename):
@@ -222,8 +254,8 @@ class QueuePreset():
         if not filename or not Path(filename).exists():
             return
 
-        self.loaded_save = filename
-        log(f'Current file: {filename}')
+        self.filename = filename
+        log(f'Loaded file: {filename}')
 
         mw.update_title()
 
@@ -240,126 +272,8 @@ class QueuePreset():
         if self.is_adding_projects:
             return
 
-
-        def do_add_projects(*files):
-
-            makedirs(join(store.working_dir, "blender/temp"), exist_ok=True)
-            CACHE_FILE = join(store.working_dir, "blender/cache.json")
-            DATA_FILE = join(store.working_dir, "blender/temp/data.json")
-            GET_DATA_PY = join(store.working_dir, "blender/get_data.py")
-
-            self.is_adding_projects = True
-            mw.update()
-
-            # Read cache
-            if Path(CACHE_FILE).exists():
-                try:
-                    with open(CACHE_FILE, 'r') as json_file:
-                        cache = json.load(json_file)
-                except:
-                    log(f'Error reading cache file: {CACHE_FILE}')
-                    return
-            else:
-                cache = {}
-
-            files = [ join(file) for file in files if file.endswith(".blend")]
-            amount = 0
-
-            for i, file in enumerate(files):
-                mod_time = int(Path(file).stat().st_mtime)
-
-                skip = False
-
-                for project in self.project_list:
-                    if file == project.file:
-                        skip = True
-                        break
-
-                if skip:
-                    continue
-
-                if not amount:
-                    print("------------------------")
-                    log("Loading new projects...")
-
-                # Get cached project data
-                if file in cache and cache[file]['mod_time'] == mod_time:
-                    data = cache[file]
-                    log(f'({i + 1}/{len(files)}) Loading cache: {file}')
-
-                # Get project data
-                else:
-                    BATCH_FILE = join(store.working_dir, f'blender/temp/get_data.bat')
-                    BATCH = f"""
-@CHCP 65001 > NUL
-blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA_FILE}"
-"""
-
-                    with open(BATCH_FILE, 'w') as f:
-                        f.write(BATCH.strip())
-
-                    log(f'({i + 1}/{len(files)}) Opening project: {file}')
-
-                    process = subprocess.Popen([BATCH_FILE],
-                                            # stderr=subprocess.STDOUT,
-                                            # stdout=subprocess.PIPE,
-                                            # stdin=subprocess.PIPE,
-                                            #    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, #DETACHED_PROCESS
-                                            #    creationflags=subprocess.DETACHED_PROCESS, #DETACHED_PROCESS
-                                            #    preexec_fn=os.setsid,
-                                            cwd=join(Path(self.blender_exe).parent),
-                                            shell=True
-                                            )
-
-                    process.wait()
-
-                    if not Path(DATA_FILE).exists():
-                        log(f'Could not fetch project data: {file} | Data: {DATA_FILE}')
-                        return
-
-                    # Read project data
-                    with open(DATA_FILE, 'r') as json_file:
-                        data = json.load(json_file)
-
-                    # Write cache project data
-                    data['mod_time'] = mod_time
-                    cache[file] = data
-
-                    with open(CACHE_FILE, 'w') as json_file:
-                        json_file.write(json.dumps(cache, indent=4))
-
-                # Unpack project data
-                project = BlendProject(
-                    file,
-                    frame_start=data['frame_start'],
-                    frame_end=data['frame_end'],
-                    scene=data['scene'],
-                    scene_list=data['scene_list'],
-                    camera=data['camera'],
-                    camera_list=data['camera_list'],
-                    render_filepath=data['render_filepath'],
-                    file_format=data['file_format'],
-                    use_persistent_data=data['use_persistent_data'],
-                    use_adaptive_sampling=data['use_adaptive_sampling'],
-                    samples=data['samples'],
-                    denoiser=data['denoiser'],
-                    denoising_use_gpu=data['denoising_use_gpu'],
-                    denoising_input_passes=data['denoising_input_passes'],
-                    denoising_prefilter=data['denoising_prefilter'],
-                )
-
-                self.project_list.append(project)
-                mw.update_list(rearrange=False)
-                amount += 1
-
-                self.need_save()
-
-            if amount: log(f'All projects loaded!')
-            self.is_adding_projects = False
-            mw.update()
-
-        t = Thread(target=do_add_projects, args=tuple(files))
-        t.start()
+        self.loader_thread = LoaderThread(*files)
+        self.loader_thread.start()
 
 
     def start_render(self):
@@ -372,18 +286,15 @@ blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA
 
         self.init_render_variables(gui=True)
 
-        for project in self.project_list:
-            self.global_frames += len(project.get_frames_list())
+        self.render_thread = RenderThread() #qtc.QThread()
+        # self.render_worker = RenderThread()
+        # self.render_worker.moveToThread(self.render_thread)
 
-        self.render_thread = qtc.QThread()
-        self.render_worker = RenderWorker()
-        self.render_worker.moveToThread(self.render_thread)
-
-        self.render_thread.started.connect(self.render_worker.run)
+        # self.render_thread.started.connect(self.render_worker.run)
         self.render_thread.finished.connect(self.render_thread.deleteLater)
 
-        self.render_worker.finished.connect(self.render_thread.quit)
-        self.render_worker.finished.connect(self.render_worker.deleteLater)
+        # self.render_worker.finished.connect(self.render_thread.quit)
+        # self.render_worker.finished.connect(self.render_worker.deleteLater)
 
         self.render_thread.start()
 
@@ -419,13 +330,13 @@ blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA
 
         def do_shutdown(delay):
             self.is_shutting_down = True
-            mw.update()
+            mw.update_widgets.emit()
             monitor.screen_on()
 
             for i in range(int(delay)):
                 d = delay - i
                 log(f'Shutting down in {d:.0f} {"seconds" if d > 1 else "second"}.')
-                mw.update()
+                mw.update_widgets.emit()
                 sleep(1)
 
                 if not self.is_shutting_down:
@@ -437,7 +348,7 @@ blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA
             if not DEV_MODE:
                 subprocess.call(["shutdown", "-s", "-t", "15"])
 
-            mw.update()
+            mw.update_widgets.emit()
 
         t = Thread(target=do_shutdown, args=(delay,))
         t.start()
@@ -449,13 +360,34 @@ blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA
         """
 
         self.is_shutting_down = False
-        mw.update()
+        mw.update_widgets.emit()
 
 
 ################################################################################
 ## Main Window
 
+class QListWidget(qtw.QListWidget):
+    """
+    Custom List Widget that fixed disappearing items.
+    https://stackoverflow.com/questions/74263946/widget-inside-qlistwidgetitem-disappears-after-internal-move
+    """
+
+    def dragMoveEvent(self, event):
+
+        if ((target := self.row(self.itemAt(event.pos()))) ==
+            (current := self.currentRow()) + 1 or
+            (current == self.count() - 1 and target == -1)):
+            event.ignore()
+
+        else:
+            super().dragMoveEvent(event)
+
+
 class MainWindow(qtw.QMainWindow):
+    update_widgets = qtc.pyqtSignal()
+    update_list = qtc.pyqtSignal(bool)
+    log = qtc.pyqtSignal(str)
+
 
     def __init__(self):
         super().__init__()
@@ -463,7 +395,7 @@ class MainWindow(qtw.QMainWindow):
         self.update_title()
         self.setWindowIcon(qtg.QIcon(ICON))
 
-        self.setMinimumWidth(1200)
+        self.setMinimumWidth(1000)
         self.setMinimumHeight(600)
         self.setAcceptDrops(True)
         self.setAttribute(Qt.WA_DeleteOnClose)
@@ -483,7 +415,7 @@ class MainWindow(qtw.QMainWindow):
 
             # [button] Save
             self.w_locateSave = w_locateSave = qtw.QPushButton("", clicked=lambda: preset.save_as())
-            w_locateSave.clicked.connect(lambda: self.update())
+            w_locateSave.clicked.connect(lambda: self.update_widgets.emit())
             w_locateSave.setIcon(qtg.QIcon('kqueue/icons/save.svg'))
             w_locateSave.setToolTip("Save the current file in the desired location.")
             # w_locateSave.setFixedWidth(100)
@@ -491,7 +423,7 @@ class MainWindow(qtw.QMainWindow):
 
             # [button] Load
             self.w_locateLoad = w_locateLoad = qtw.QPushButton("", clicked=lambda: preset.load_from())
-            w_locateLoad.clicked.connect(lambda: self.update())
+            w_locateLoad.clicked.connect(lambda: self.update_widgets.emit())
             w_locateLoad.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
             w_locateLoad.setToolTip("Open a kQueue file.")
             # w_locateLoad.setFixedWidth(100)
@@ -499,7 +431,7 @@ class MainWindow(qtw.QMainWindow):
 
             # [button] Locate Blender
             self.w_locateBlender = w_locateBlender = qtw.QPushButton("", clicked=lambda: preset.locate_blender())
-            w_locateBlender.clicked.connect(lambda: self.update())
+            w_locateBlender.clicked.connect(lambda: self.update_widgets.emit())
             w_locateBlender.setIcon(qtg.QIcon('kqueue/icons/blender.svg'))
             w_locateBlender.setToolTip("Locate a Blender executable.")
             # w_locateBlender.setFixedWidth(100)
@@ -519,13 +451,13 @@ class MainWindow(qtw.QMainWindow):
         # [list] List of Projects
         def open_project_settings(self):
             project = self.get_selected_project()
-            self.sw = BlendProjectWindow(project)
+            self.sw = QBlendProjectSettings(project)
             self.sw.show()
 
-        self.w_listOfProjects = w_listOfProjects = qtw.QListWidget()
+        self.w_listOfProjects = w_listOfProjects = QListWidget()
         w_listOfProjects.itemDoubleClicked.connect(lambda: open_project_settings(self))
         w_listOfProjects.setDragDropMode(qtw.QAbstractItemView.InternalMove)
-        w_listOfProjects.model().rowsMoved.connect(lambda: self.update_list(rearrange=True))
+        w_listOfProjects.model().rowsMoved.connect(lambda: self.update_list.emit(True))
         w_vBoxLayout.addWidget(w_listOfProjects)
 
         # # [label] Global Settings
@@ -598,15 +530,13 @@ class MainWindow(qtw.QMainWindow):
         # w_vBoxLayout.addSpacing(10)
 
 
-
         # [check] Preview Render
         self.w_preview_render = w_preview_render = qtw.QCheckBox("Preview Render")
         w_vBoxLayout.addWidget(w_preview_render)
 
         def toggle_preview_render():
             preset.preview_render = w_preview_render.isChecked()
-            self.update_list()
-            print(preset.preview_render)
+            self.update_list.emit(False)
 
         w_preview_render.clicked.connect(lambda: toggle_preview_render())
 
@@ -616,23 +546,20 @@ class MainWindow(qtw.QMainWindow):
 
         def toggle_selective():
             preset.selective_render = w_selective.isChecked()
-            self.update_list()
-            print(preset.selective_render)
+            self.update_list.emit(False)
+            self.update_widgets.emit()
 
         w_selective.clicked.connect(lambda: toggle_selective())
 
         # [check] Assign sRGB
-        self.w_assign_srgb = w_assign_srgb = qtw.QCheckBox("Save as sRGB (preserve View, Look etc.)")
+        self.w_assign_srgb = w_assign_srgb = qtw.QCheckBox("Save as sRGB")
         w_vBoxLayout.addWidget(w_assign_srgb)
 
         def toggle_assign_srgb():
             preset.assign_srgb = w_assign_srgb.isChecked()
-            self.update_list()
-            print(preset.assign_srgb)
+            self.update_list.emit(False)
 
         w_assign_srgb.clicked.connect(lambda: toggle_assign_srgb())
-
-
 
 
         # ! [hbox] Start and Stop Render
@@ -724,6 +651,11 @@ class MainWindow(qtw.QMainWindow):
         w_screensOff.setFixedHeight(40)
         w_hBoxLayout.addWidget(w_screensOff)
 
+        # Signals
+        self.update_widgets.connect(self.__update_widgets)
+        self.update_list.connect(self.__update_list)
+        self.log.connect(self.__log)
+
 
     def update_title(self):
         """
@@ -732,8 +664,8 @@ class MainWindow(qtw.QMainWindow):
         title = TITLE if not DEV_MODE else APPID
         title += " " + ".".join([str(v) for v in VERSION])
 
-        if store.preset and store.preset.loaded_save:
-            filename = store.preset.loaded_save
+        if store.preset and store.preset.filename:
+            filename = store.preset.filename
             save_needed = store.preset.save_needed
 
             fn = filename.rsplit("/", 1)[-1].rsplit(".", 1)[0]
@@ -748,50 +680,64 @@ class MainWindow(qtw.QMainWindow):
         self.setWindowTitle(title)
 
 
-    def update_list(self, rearrange=False):
+    def __update_list(self, sync=False):
         """
         Update list widget and `preset.project_list` list.
         """
 
-        if rearrange:
-            file_list = []
+        # Sync variable with the list widget
+        if sync:
+            project_list = []
 
             for i in range(self.w_listOfProjects.count()):
                 item = self.w_listOfProjects.item(i)
-                file_list.append(item.text().split(".blend")[0] + ".blend")
+                w_project = self.w_listOfProjects.itemWidget(item)
+                project_list.append(w_project.project)
 
-            project_list = preset.project_list.copy()
-            preset.project_list = []
+            preset.project_list = project_list
 
-            for file in file_list:
-                for project in project_list:
-                    if file == project.file: preset.project_list.append(project)
-
+        # Add items to the list widget
         self.w_listOfProjects.clear()
 
         for project in preset.project_list:
-            self.w_listOfProjects.addItem(f'{project.file} ({project.get_frames()} | {project.get_samples()} samples | {project.camera}) => {project.get_render_filepath()}')
-            print(project.file)
+            w_project = QBlendProject(project=project)
 
-        global_frames = 0
+            w_project.set_filename(project.file)
+            w_project.set_active(project.active)
+            w_project.set_frames(project.get_frames())
+            w_project.set_samples(project.get_samples())
+            w_project.set_camera(project.camera)
+            w_project.set_render_filepath(project.get_render_filepath())
+
+            item = qtw.QListWidgetItem(self.w_listOfProjects)
+            item.setSizeHint(w_project.sizeHint())
+
+            self.w_listOfProjects.addItem(item)
+            self.w_listOfProjects.setItemWidget(item, w_project)
+
+        # Calculate frames
         project_frames = None
 
         for project in preset.project_list:
+
+            if not project.active:
+                continue
+
             frames = len(project.get_frames_list())
-            global_frames += frames
 
             if project_frames is None:
                 project_frames = frames
 
-        self.w_gProgress.setText(f'0/{global_frames}' if global_frames or preset.project_list else "Global:")
-        self.w_pProgress.setText(f'0/{project_frames}' if project_frames or preset.project_list else "Project:")
+        global_frames = preset.get_global_frames_number()
+        self.w_gProgress.setText(f'0/{global_frames or 0}' if global_frames or preset.project_list else "Global:")
+        self.w_pProgress.setText(f'0/{project_frames or 0}' if project_frames or preset.project_list else "Project:")
 
         self.w_gProgressBar.setValue(0)
         self.w_pProgressBar.setValue(0)
         self.w_rProgressBar.setValue(0)
 
 
-    def update(self):
+    def __update_widgets(self):
 
         if preset.is_status('RENDERING') or preset.is_status('RENDERING_STOPPING'):
             self.w_locateSave.setEnabled(False)
@@ -810,7 +756,8 @@ class MainWindow(qtw.QMainWindow):
             self.w_preview_render.setEnabled(True)
 
         self.w_openFolder.setEnabled(bool(preset.blender_exe))
-        self.w_startRender.setEnabled(bool(preset.blender_exe and not preset.is_status('RENDERING') and preset.project_list))
+
+        self.w_startRender.setEnabled(bool(preset.blender_exe and not preset.is_status('RENDERING') and preset.project_list and preset.get_global_frames_number()))
         self.w_stopRender.setEnabled(preset.is_status('RENDERING') and not preset.is_status('RENDERING_STOPPING'))
         self.w_listOfProjects.setEnabled(bool(not preset.is_adding_projects and not preset.is_status('RENDERING')))
         self.w_cancelShutdown.setEnabled(bool(preset.is_shutting_down))
@@ -823,6 +770,9 @@ class MainWindow(qtw.QMainWindow):
 
 
     def dragEnterEvent(self, event):
+        """
+        Handle drag and drop .blend files.
+        """
 
         if event.mimeData().hasUrls():
             event.accept()
@@ -831,14 +781,18 @@ class MainWindow(qtw.QMainWindow):
 
 
     def keyPressEvent(self, event):
+        """
+        Handle key presses.
+        """
 
+        # Delete
         if event.key() == Qt.Key_Delete:
 
             if preset.project_list:
                 project = self.get_selected_project()
                 preset.project_list.remove(project)
-                self.update_list()
-                self.update()
+                self.update_list.emit(False)
+                self.update_widgets.emit()
 
 
     def get_selected_project(self):
@@ -847,14 +801,8 @@ class MainWindow(qtw.QMainWindow):
         """
 
         item = self.w_listOfProjects.currentItem()
-        file = item.text().split(".blend")[0] + ".blend"
-
-        for p in preset.project_list:
-
-            if p.file == file:
-                return p
-
-        return None
+        w_project = self.w_listOfProjects.itemWidget(item)
+        return w_project.project if w_project else None
 
 
     def dropEvent(self, event):
@@ -871,24 +819,31 @@ class MainWindow(qtw.QMainWindow):
         Close [x] event.
         """
 
-        result = qtw.QMessageBox.question(self,
-                      "Confirm Exit...",
-                      "Are you sure you want to exit?",
-                      qtw.QMessageBox.Yes| qtw.QMessageBox.No)
-        event.ignore()
-
-        if result == qtw.QMessageBox.Yes:
+        if DEV_MODE:
+            event.ignore()
             preset.stop_render()
             event.accept()
 
+        else:
+            result = qtw.QMessageBox.question(self,
+                        "Confirm Exit...",
+                        "Are you sure you want to exit?",
+                        qtw.QMessageBox.Yes| qtw.QMessageBox.No)
+            event.ignore()
 
-    def set_log_text(self, line):
-        self.w_logOutput.setText(line)
+            if result == qtw.QMessageBox.Yes:
+                preset.stop_render()
+                event.accept()
 
 
-    def log(self, *args, **kwargs):
-        log(*args, **kwargs)
+    # def log(self, *args, **kwargs):
+    #     log(*args, **kwargs)
 
+    def __log(self, text):
+        self.w_logOutput.setText(text)
+
+
+################################################################################
 
 def log(*args, developer=False):
     """
@@ -904,7 +859,7 @@ def log(*args, developer=False):
         return
 
     if not line.startswith('WARN '):
-        mw.set_log_text(line)
+        mw.log.emit(line)
 
     print(line)
 
@@ -915,8 +870,8 @@ windll.shell32.SetCurrentProcessExplicitAppUserModelID(APPID)
 store.app = app = qtw.QApplication([])
 store.mw = mw = MainWindow()
 store.preset = preset = QueuePreset()
-mw.update()
-
+mw.update_widgets.emit()
+# app.setStyle("fusion")
 app.setStyleSheet('''
 QLabel {
     font-size: 10px;
@@ -958,10 +913,10 @@ QListWidget {
 ############################################################################
 
 if DEV_MODE:
-    preset.set_blender("H:/Blender Foundation/blender-4.3.0/blender.exe")
-    preset.add_projects("I:/Blender Library/00_Parts/00_Intro/00_Inside/001_Butterflies.blend",
-                        "I:/Blender Library/00_Parts/00_Intro/00_Inside/002_GuitarTuning.blend")
-    mw.update()
+    preset.set_blender("H:/Blender Foundation/blender-4.3.2/blender.exe")
+    # preset.add_projects("I:/Blender Library/00_Parts/00_Intro/03_HomeRoaming (old)/001.blend")
+    #                     "I:/Blender Library/00_Parts/00_Intro/00_Inside/002_GuitarTuning.blend")
+    # mw.update_widgets.emit()
 
 
 ############################################################################

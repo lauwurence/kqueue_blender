@@ -1,28 +1,34 @@
 ################################################################################
-## Save and Load projects
+## Save and Load kQueue Files
 
-from pickle import dump as p_dump
-from pickle import load as p_load
+from pickle import dump, load
+from . import store
 
 
-def save(data, filename, version):
+def save_file(data, filename, version):
     """
-    Save project.
-    """
-
-    with open(filename, "wb") as f:
-        p_dump(version, f)
-        p_dump(data, f)
-
-
-def load(filename):
-    """
-    Load project.
+    Save file.
     """
 
-    with open(filename, "rb") as f:
-        version = p_load(f)
-        data = p_load(f)
+    with open(filename, 'wb') as f:
+        dump(version, f)
+        dump(data, f)
+
+
+def load_file(filename):
+    """
+    Load file.
+    """
+
+    try:
+        with open(filename, 'rb') as f:
+            version = load(f)
+            data = load(f)
+
+    except:
+        version = None
+        data = None
+        store.mw.log.emit(f'Unable to load file: {filename}')
 
     return version, data
 
