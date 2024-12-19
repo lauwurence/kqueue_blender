@@ -7,9 +7,13 @@ Queue your Blender render projects and override settings.
 1. Save and load kQueue project files.
 2. Fetch and cache Blender project data.
 3. Render specific frame ranges, override render settings.
-5. Turn screens off.
-6. Shutdown PC on complete.
-7. (TODO:) Render frames that were not rendered.
+4. Render in render preview mode (Workbench rendered, SubD 0).
+5. Render only non-existing images.
+6. Save as sRGB (if you work in other color spaces).
+7. Open last rendered frame or path.
+8. Turn screens off.
+9. Shutdown PC on complete.
+10. (TODO:) Render frames that were not rendered.
 
 ## Installation:
 Required libraries: PyQt5 (to draw the UI), psutil (to kill processes), pygame (to play sounds).
