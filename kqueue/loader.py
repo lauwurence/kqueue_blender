@@ -127,6 +127,7 @@ blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA
             )
 
             preset.project_list.append(project)
+            mw.update_list.emit(False)
             mw.update_widgets.emit()
             at_least_one = True
 

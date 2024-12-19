@@ -1,0 +1,17 @@
+__pycache__/
+.vscode/
+*.py[cod]
+*.cache
+
+# Folders
+temp/
+old/
+saves/
+
+# Extensions
+*.psd
+*.jqp
+
+# Files
+test.py
+cache.json
