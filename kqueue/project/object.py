@@ -75,13 +75,15 @@ class BlendProject():
             rv = []
 
             for frame in filter_frames(self.get_frames()):
-                filename = f'{self.get_render_filepath()}{frame:04}{ext}'
-                # basename = filename.rsplit("/", 1)[-1]
+                filepath = self.get_render_filepath()
+                dir, basename = filepath.rsplit("\\", 1)
+                zeros = basename.count("#") or 4
+                number = str(frame)
 
-                # if "#" in basename:
-                #     zeros = basename.count("#")
-                # else:
-                #     zeros = 4
+                while len(number) < zeros:
+                    number = "0" + number
+
+                filename = f'{dir}\\{basename.replace("#", "")}{number}{ext}'
 
                 if Path(filename).exists():
                     continue
@@ -104,8 +106,3 @@ class BlendProject():
     def get_denoising_use_gpu(self): return self.get(self.denoising_use_gpu_override, self.denoising_use_gpu)
     def get_denoising_input_passes(self): return self.get(self.denoising_input_passes_override, self.denoising_input_passes)
     def get_denoising_prefilter(self): return self.get(self.denoising_prefilter_override, self.denoising_prefilter)
-
-
-
-
-

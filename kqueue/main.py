@@ -33,7 +33,15 @@ if hasattr(Qt, 'AA_UseHighDpiPixmaps'):
 
 ################################################################################
 
+# Init path variables
 store.working_dir = join(getcwd() + "/kqueue")
+store.cache_file = Path(join(getcwd(), CACHE_FILE))
+store.bridge_file = Path(join(getcwd(), BRIDGE_FILE))
+store.get_data_py = Path(join(getcwd(), GET_DATA_PY))
+store.get_data_bat = Path(join(getcwd(), GET_DATA_BAT))
+store.temp_folder = Path(join(getcwd(), TEMP_FOLDER))
+
+print(store.get_data_bat, store.get_data_bat.exists())
 
 
 ################################################################################
@@ -105,7 +113,7 @@ class QueuePreset():
             return
 
         self.save_needed = value
-        mw.update_title()
+        mw.update_title.emit()
 
 
     def init_render_variables(self, gui=False):
@@ -257,7 +265,7 @@ class QueuePreset():
         self.filename = filename
         log(f'Loaded file: {filename}')
 
-        mw.update_title()
+        mw.update_title.emit()
 
 
     def add_projects(self, *files):
@@ -386,13 +394,13 @@ class QListWidget(qtw.QListWidget):
 class MainWindow(qtw.QMainWindow):
     update_widgets = qtc.pyqtSignal()
     update_list = qtc.pyqtSignal(bool)
+    update_title = qtc.pyqtSignal()
     log = qtc.pyqtSignal(str)
 
 
     def __init__(self):
         super().__init__()
 
-        self.update_title()
         self.setWindowIcon(qtg.QIcon(ICON))
 
         self.setMinimumWidth(1000)
@@ -654,10 +662,13 @@ class MainWindow(qtw.QMainWindow):
         # Signals
         self.update_widgets.connect(self.__update_widgets)
         self.update_list.connect(self.__update_list)
+        self.update_title.connect(self.__update_title)
         self.log.connect(self.__log)
 
+        self.update_title.emit()
 
-    def update_title(self):
+
+    def __update_title(self):
         """
         """
 

@@ -11,4 +11,11 @@ ICON = "kqueue/icons/icon.svg"
 RENDER_START_AUDIO = "kqueue/audio/render_started.ogg"
 RENDER_STOP_AUDIO = "kqueue/audio/render_stopped.ogg"
 RENDER_FINISH_AUDIO = "kqueue/audio/render_finished.ogg"
+
 SAVE_FOLDER = "saves/"
+TEMP_FOLDER = "kqueue/blender/temp/"
+
+CACHE_FILE = "kqueue/blender/cache.json"
+BRIDGE_FILE = f"{TEMP_FOLDER}data.json"
+GET_DATA_BAT = f"{TEMP_FOLDER}get_data.bat"
+GET_DATA_PY = "kqueue/blender/get_data.py"

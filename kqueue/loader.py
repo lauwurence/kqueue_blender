@@ -11,7 +11,7 @@ from .utils.path import join
 from .config import *
 from . import store
 from .project.object import BlendProject
-from . import main
+from . import main, save_load
 
 
 class LoaderThread(qtc.QThread):
@@ -27,24 +27,13 @@ class LoaderThread(qtc.QThread):
         preset = store.preset
         mw = store.mw
 
-        makedirs(join(store.working_dir, "blender/temp"), exist_ok=True)
-        CACHE_FILE = join(store.working_dir, "blender/cache.json")
-        DATA_FILE = join(store.working_dir, "blender/temp/data.json")
-        GET_DATA_PY = join(store.working_dir, "blender/get_data.py")
+        makedirs(store.temp_folder, exist_ok=True)
 
         preset.is_adding_projects = True
         mw.update_widgets.emit()
 
-        # Read cache
-        if Path(CACHE_FILE).exists():
-            try:
-                with open(CACHE_FILE, 'r') as json_file:
-                    cache = json.load(json_file)
-            except:
-                main.log(f'Error reading cache file: {CACHE_FILE}')
-                return
-        else:
-            cache = {}
+        # Load cache
+        cache = save_load.load_cache(otherwise={})
 
         files = [ join(file) for file in self.files if file.endswith(".blend")]
         at_least_one = False
@@ -61,24 +50,23 @@ class LoaderThread(qtc.QThread):
                 main.log("Loading new projects...")
 
             # Get cached project data
-            if file in cache and cache[file]['mod_time'] == mod_time:
-                data = cache[file]
+            if file in cache and (cache[file]['mod_time'] == mod_time):
                 main.log(f'({i + 1}/{len(files)}) Loading cache: {file}')
+                data = cache[file]
 
             # Get project data
             else:
-                BATCH_FILE = join(store.working_dir, f'blender/temp/get_data.bat')
-                BATCH = f"""
-@CHCP 65001 > NUL
-blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA_FILE}"
-"""
-
-                with open(BATCH_FILE, 'w') as f:
-                    f.write(BATCH.strip())
-
                 main.log(f'({i + 1}/{len(files)}) Opening project: {file}')
 
-                process = subprocess.Popen([BATCH_FILE],
+                BATCH = f"""
+@CHCP 65001 > NUL
+blender "{file}" --factory-startup --background  --python "{store.get_data_py.resolve()}" "{store.bridge_file.resolve()}"
+"""
+
+                with open(store.get_data_bat, 'w') as f:
+                    f.write(BATCH.strip())
+
+                process = subprocess.Popen([store.get_data_bat.resolve()],
                                         # stderr=subprocess.STDOUT,
                                         # stdout=subprocess.PIPE,
                                         # stdin=subprocess.PIPE,
@@ -91,20 +79,20 @@ blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA
 
                 process.wait()
 
-                if not Path(DATA_FILE).exists():
-                    main.log(f'Could not fetch project data: {file} | Data: {DATA_FILE}')
+                if not store.bridge_file.exists():
+                    main.log(f'Could not fetch project data: {file} | Bridge: {store.bridge_file}')
                     return
 
                 # Read project data
-                with open(DATA_FILE, 'r') as json_file:
-                    data = json.load(json_file)
+                with open(store.bridge_file, 'r') as f:
+                    data = json.load(f)
 
                 # Write cache project data
                 data['mod_time'] = mod_time
                 cache[file] = data
 
-                with open(CACHE_FILE, 'w') as json_file:
-                    json_file.write(json.dumps(cache, indent=4))
+                # Update cache
+                save_load.save_cache(cache)
 
             # Unpack project data
             project = BlendProject(
@@ -131,9 +119,10 @@ blender "{file}" --factory-startup --background  --python "{GET_DATA_PY}" "{DATA
             mw.update_widgets.emit()
             at_least_one = True
 
+        if at_least_one:
             preset.need_save()
+            main.log(f'All projects loaded!')
 
-        if at_least_one: main.log(f'All projects loaded!')
         preset.is_adding_projects = False
 
         mw.update_list.emit(False)

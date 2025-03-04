@@ -5,7 +5,7 @@ import bpy
 import json
 from pathlib import Path
 
-DATA_FILE = sys.argv[6]
+BRIDGE_FILE = sys.argv[6]
 
 scene = bpy.context.scene
 cycles = scene.cycles
@@ -15,8 +15,10 @@ print("BLENDER-START----------------------------------------")
 
 def main():
 
-    if not DATA_FILE.endswith(".json"):
-        raise Exception(f'Bad data file name: {DATA_FILE}')
+    bridge_file = Path(BRIDGE_FILE)
+
+    if bridge_file.suffix != ".json":
+        raise Exception(f'Bad data file name: {bridge_file.resolve()}')
 
     data = {}
 
@@ -41,13 +43,13 @@ def main():
             data[key] = eval(value)
 
     except:
-        if Path(DATA_FILE).exists():
-            os.remove(DATA_FILE)
+        if bridge_file.exists():
+            os.remove(bridge_file.resolve())
 
         raise Exception("Error fetching data.")
 
-    with open(DATA_FILE, 'w') as json_file: #encoding="utf-8"
-        json_file.write(json.dumps(data, indent=4))
+    with open(bridge_file, 'w') as f: #encoding="utf-8"
+        f.write(json.dumps(data, indent=4))
 
     print("Data fetched successfully.")
 
