@@ -10,7 +10,7 @@ saves/
 
 # Extensions
 *.psd
-*.jqp
+*.kqp
 
 # Files
 test.py
