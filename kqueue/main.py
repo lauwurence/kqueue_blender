@@ -199,6 +199,20 @@ class QueuePreset():
         self.need_save()
 
 
+    def save(self):
+        """
+        """
+
+        if not self.filename:
+            return
+
+        from .save_load import save_file
+        save_file([self.project_list, self.blender_exe], self.filename, version=1)
+
+        self.set_save(self.filename)
+        self.need_save(False)
+
+
     def save_as(self):
         """
         Save project state as a file.
@@ -392,10 +406,13 @@ class QListWidget(qtw.QListWidget):
 
 
 class MainWindow(qtw.QMainWindow):
-    update_widgets = qtc.pyqtSignal()
-    update_list = qtc.pyqtSignal(bool)
     update_title = qtc.pyqtSignal()
+    update_list = qtc.pyqtSignal(bool)
+    update_widgets = qtc.pyqtSignal()
     log = qtc.pyqtSignal(str)
+
+    def test(self):
+        print(1)
 
 
     def __init__(self):
@@ -421,13 +438,17 @@ class MainWindow(qtw.QMainWindow):
             w_hBoxLayout = qtw.QHBoxLayout()
             w_vBoxLayout.addLayout(w_hBoxLayout)
 
-            # [button] Save
+            # [button] Locate Save
             self.w_locateSave = w_locateSave = qtw.QPushButton("", clicked=lambda: preset.save_as())
             w_locateSave.clicked.connect(lambda: self.update_widgets.emit())
             w_locateSave.setIcon(qtg.QIcon('kqueue/icons/save.svg'))
             w_locateSave.setToolTip("Save the current file in the desired location.")
+            w_locateSave.setShortcut(qtg.QKeySequence("Ctrl+Shift+S"))
             # w_locateSave.setFixedWidth(100)
             w_hBoxLayout.addWidget(w_locateSave)
+
+            # [shortcut] Save
+            qtw.QShortcut('Ctrl+S', self).activated.connect(lambda: preset.save())
 
             # [button] Load
             self.w_locateLoad = w_locateLoad = qtw.QPushButton("", clicked=lambda: preset.load_from())
@@ -668,6 +689,76 @@ class MainWindow(qtw.QMainWindow):
         self.update_title.emit()
 
 
+    def dragEnterEvent(self, event):
+        """
+        Handle drag and drop .blend files.
+        """
+
+        if event.mimeData().hasUrls():
+            event.accept()
+        else:
+            event.ignore()
+
+
+    def keyPressEvent(self, event):
+        """
+        Handle key presses.
+        """
+
+        # Delete
+        if event.key() == Qt.Key_Delete:
+
+            if preset.project_list:
+                project = self.get_selected_project()
+                preset.project_list.remove(project)
+                self.update_list.emit(False)
+                self.update_widgets.emit()
+
+
+    def get_selected_project(self):
+        """
+        Get selected project.
+        """
+
+        item = self.w_listOfProjects.currentItem()
+        w_project = self.w_listOfProjects.itemWidget(item)
+        return w_project.project if w_project else None
+
+
+    def dropEvent(self, event):
+        """
+        Add project.
+        """
+
+        files = [ url.toLocalFile() for url in event.mimeData().urls() ]
+        preset.add_projects(*files)
+
+
+    def closeEvent(self, event):
+        """
+        Close [x] event.
+        """
+
+        if DEV_MODE:
+            event.ignore()
+            preset.stop_render()
+            event.accept()
+
+        else:
+            result = qtw.QMessageBox.question(self,
+                        "Confirm Exit...",
+                        "Are you sure you want to exit?",
+                        qtw.QMessageBox.Yes| qtw.QMessageBox.No)
+            event.ignore()
+
+            if result == qtw.QMessageBox.Yes:
+                preset.stop_render()
+                event.accept()
+
+
+    ############################################################################
+    # Emitters
+
     def __update_title(self):
         """
         """
@@ -779,76 +870,6 @@ class MainWindow(qtw.QMainWindow):
         self.w_assign_srgb.setChecked(bool(preset.assign_srgb))
         self.w_preview_render.setChecked(bool(preset.preview_render))
 
-
-    def dragEnterEvent(self, event):
-        """
-        Handle drag and drop .blend files.
-        """
-
-        if event.mimeData().hasUrls():
-            event.accept()
-        else:
-            event.ignore()
-
-
-    def keyPressEvent(self, event):
-        """
-        Handle key presses.
-        """
-
-        # Delete
-        if event.key() == Qt.Key_Delete:
-
-            if preset.project_list:
-                project = self.get_selected_project()
-                preset.project_list.remove(project)
-                self.update_list.emit(False)
-                self.update_widgets.emit()
-
-
-    def get_selected_project(self):
-        """
-        Get selected project.
-        """
-
-        item = self.w_listOfProjects.currentItem()
-        w_project = self.w_listOfProjects.itemWidget(item)
-        return w_project.project if w_project else None
-
-
-    def dropEvent(self, event):
-        """
-        Add project.
-        """
-
-        files = [ url.toLocalFile() for url in event.mimeData().urls() ]
-        preset.add_projects(*files)
-
-
-    def closeEvent(self, event):
-        """
-        Close [x] event.
-        """
-
-        if DEV_MODE:
-            event.ignore()
-            preset.stop_render()
-            event.accept()
-
-        else:
-            result = qtw.QMessageBox.question(self,
-                        "Confirm Exit...",
-                        "Are you sure you want to exit?",
-                        qtw.QMessageBox.Yes| qtw.QMessageBox.No)
-            event.ignore()
-
-            if result == qtw.QMessageBox.Yes:
-                preset.stop_render()
-                event.accept()
-
-
-    # def log(self, *args, **kwargs):
-    #     log(*args, **kwargs)
 
     def __log(self, text):
         self.w_logOutput.setText(text)
