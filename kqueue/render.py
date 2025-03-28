@@ -65,6 +65,7 @@ render.filepath = "{project.get_render_filepath().replace('\\', '/')}"
 render.use_overwrite = True
 render.use_simplify = True
 render.simplify_subdivision_render = 0
+render.use_border = False
 
 # Render
 shading.color_type = "TEXTURE"
@@ -93,6 +94,7 @@ render.use_persistent_data = {project.get_use_persistent_data()}
 render.filepath = "{project.get_render_filepath().replace('\\', '/')}"
 render.use_overwrite = True
 render.use_simplify = False
+render.use_border = False
 
 # Render
 cycles.use_adaptive_sampling = {project.get_use_adaptive_sampling()}
@@ -110,8 +112,9 @@ render.compositor_device = "GPU"
 render.compositor_precision = "FULL"
 """
 
-            # Assign sRGB if needed
-            if preset.assign_srgb:
+            # Technically, take scene settings and assigning sRGB
+            if preset.assign_srgb or True:
+                PYTHON += "\nrender.image_settings.color_management = 'FOLLOW_SCENE'"
                 PYTHON += "\nscene.display_settings.display_device = 'sRGB'"
 
             with open(PYTOH_FILE, 'w', encoding="utf-8") as f:
