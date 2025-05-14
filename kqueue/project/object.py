@@ -89,8 +89,6 @@ class BlendProject():
         else:
             frames = self.get_markers()
 
-        print(frames)
-
         if store.preset.selective_render:
             rv = []
 
