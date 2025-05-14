@@ -43,7 +43,7 @@ class RenderThread(qtc.QThread):
                 break
 
             sc = project.get_scene()
-            fl = project.get_frames_list(marker_render=preset.marker_render)
+            fl = project.get_frames_list()
             ca = project.get_camera()
 
             if not sc or not fl or not ca:

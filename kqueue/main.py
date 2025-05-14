@@ -104,7 +104,7 @@ class QueuePreset():
         """
         Get total frames number.
         """
-        return sum([ len(p.get_frames_list(marker_render=self.marker_render)) for p in self.project_list if p.active ])
+        return sum([ len(p.get_frames_list()) for p in self.project_list if p.active ])
 
 
     def need_save(self, value=True):
@@ -129,7 +129,7 @@ class QueuePreset():
         self.global_render_start_time = time()
         self.render_start_time = time()
         self.render_avg_time = set()
-        self.global_frames = sum([ len(p.get_frames_list(marker_render=self.marker_render)) for p in self.project_list if p.active ])
+        self.global_frames = sum([ len(p.get_frames_list()) for p in self.project_list if p.active ])
         self.global_frame = 0
         self.project_frames = 0
         self.project_frame = 0
@@ -838,7 +838,7 @@ class MainWindow(qtw.QMainWindow):
             if not project.active:
                 continue
 
-            frames = len(project.get_frames_list(marker_render=preset.marker_render))
+            frames = len(project.get_frames_list())
 
             if project_frames is None:
                 project_frames = frames

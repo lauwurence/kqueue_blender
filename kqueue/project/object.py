@@ -69,7 +69,7 @@ class BlendProject():
         return ",".join([ str(m) for m in self.markers])
 
 
-    def get_frames_list(self, marker_render=False):
+    def get_frames_list(self):
         """
         """
 
@@ -84,7 +84,7 @@ class BlendProject():
         else:
             return []
 
-        if not marker_render:
+        if not store.preset.marker_render:
             frames = self.get_frames()
         else:
             frames = self.get_markers()
