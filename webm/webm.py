@@ -23,7 +23,7 @@ QV = 4
 
 # Output video FPS and speed.
 FPS = 48
-SPEED = 2
+SPEED = 1
 
 # Interpolate frames, create new ones in between `FPS`.
 # INTERPOLATE = None #2
@@ -81,7 +81,7 @@ def run_1st_pass(input_file, params):
 
     ffInput = ffmpeg.input(str(input_file))
     ffOutput = ffInput.output('pipe:', **params)
-    ffOutput.run(capture_stdout=True)
+    ffOutput.run(overwrite_output=True)
 
     print("1st pass finished!")
     return params

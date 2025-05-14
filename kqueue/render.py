@@ -43,7 +43,7 @@ class RenderThread(qtc.QThread):
                 break
 
             sc = project.get_scene()
-            fl = project.get_frames_list()
+            fl = project.get_frames_list(marker_render=preset.marker_render)
             ca = project.get_camera()
 
             if not sc or not fl or not ca:
@@ -127,6 +127,8 @@ render.compositor_precision = "FULL"
 blender --background "{project.file}" --scene "{sc}" -E "{'CYCLES' if not preset.preview_render else 'BLENDER_WORKBENCH'}" --python "{PYTOH_FILE}" -f "{",".join([str(f) for f in fl])}"
 @echo ---BLENDER-RENDER-END
 """
+
+# BLENDER_WORKBENCH, BLENDER_EEVEE_NEXT, CYCLES
 
 #--cycles-device OPTIX
 

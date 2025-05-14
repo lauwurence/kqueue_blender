@@ -42,6 +42,17 @@ def main():
         }.items():
             data[key] = eval(value)
 
+        markers = []
+
+        for marker in scene.timeline_markers:
+
+            if not marker.name.startswith("F_"):
+                continue
+
+            markers.append(marker.frame)
+
+        data['markers'] = markers
+
     except:
         if bridge_file.exists():
             os.remove(bridge_file.resolve())

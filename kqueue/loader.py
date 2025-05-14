@@ -112,6 +112,7 @@ blender "{file}" --factory-startup --background  --python "{store.get_data_py.re
                 denoising_use_gpu=data['denoising_use_gpu'],
                 denoising_input_passes=data['denoising_input_passes'],
                 denoising_prefilter=data['denoising_prefilter'],
+                markers=data.get('markers', []),
             )
 
             preset.project_list.append(project)

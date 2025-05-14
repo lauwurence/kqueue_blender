@@ -14,6 +14,7 @@ class BlendProject():
     active = True
     file_format = 'PNG'
     file_format_override = None
+    markers = []
 
     def __init__(self,
                  file,
@@ -31,7 +32,8 @@ class BlendProject():
                  denoiser,
                  denoising_use_gpu,
                  denoising_input_passes,
-                 denoising_prefilter,):
+                 denoising_prefilter,
+                 markers):
         self.active = True
         self.file = file if file else None
         self.frames, self.frames_override = f"{frame_start}-{frame_end}", None
@@ -48,6 +50,7 @@ class BlendProject():
         self.denoising_use_gpu, self.denoising_use_gpu_override = denoising_use_gpu, None
         self.denoising_input_passes, self.denoising_input_passes_override = denoising_input_passes, None
         self.denoising_prefilter, self.denoising_prefilter_override = denoising_prefilter, None
+        self.markers = markers
 
 
     def get_frames(self):
@@ -56,7 +59,17 @@ class BlendProject():
         return self.get(self.frames_override, self.frames)
 
 
-    def get_frames_list(self):
+    def get_markers(self):
+        """
+        """
+
+        if not self.markers:
+            return ""
+
+        return ",".join([ str(m) for m in self.markers])
+
+
+    def get_frames_list(self, marker_render=False):
         """
         """
 
@@ -71,10 +84,17 @@ class BlendProject():
         else:
             return []
 
+        if not marker_render:
+            frames = self.get_frames()
+        else:
+            frames = self.get_markers()
+
+        print(frames)
+
         if store.preset.selective_render:
             rv = []
 
-            for frame in filter_frames(self.get_frames()):
+            for frame in filter_frames(frames):
                 filepath = self.get_render_filepath()
                 dir, basename = filepath.rsplit("\\", 1)
                 zeros = basename.count("#") or 4
@@ -90,9 +110,9 @@ class BlendProject():
 
                 rv.append(frame)
 
-            return rv
+            return rv or []
 
-        return filter_frames(self.get_frames())
+        return filter_frames(frames) or []
 
     def get(self, v1, v2): return v2 if v1 is None else v1
     def get_scene(self): return self.get(self.scene_override, self.scene)

@@ -266,7 +266,7 @@ class QBlendProjectSettings(qtw.QWidget):
         """
         """
 
-        self.wResult_setText.emit(f'{self.project.get_frames_list()}')
+        self.wResult_setText.emit(f'{self.project.get_frames_list(store.preset.marker_render)}')
         # print(f'{self.project.get_frames_list()}')
         # self.w_result.setText(f'{self.project.get_frames_list()}')
 

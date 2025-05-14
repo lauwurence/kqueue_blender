@@ -94,6 +94,9 @@ class QueuePreset():
         # Render preview?
         self.preview_render = False
 
+        # Render by markers?
+        self.marker_render = False
+
         self.init_render_variables()
 
 
@@ -101,7 +104,7 @@ class QueuePreset():
         """
         Get total frames number.
         """
-        return sum([ len(p.get_frames_list()) for p in self.project_list if p.active ])
+        return sum([ len(p.get_frames_list(marker_render=self.marker_render)) for p in self.project_list if p.active ])
 
 
     def need_save(self, value=True):
@@ -126,7 +129,7 @@ class QueuePreset():
         self.global_render_start_time = time()
         self.render_start_time = time()
         self.render_avg_time = set()
-        self.global_frames = sum([ len(p.get_frames_list()) for p in self.project_list if p.active ])
+        self.global_frames = sum([ len(p.get_frames_list(marker_render=self.marker_render)) for p in self.project_list if p.active ])
         self.global_frame = 0
         self.project_frames = 0
         self.project_frame = 0
@@ -569,6 +572,16 @@ class MainWindow(qtw.QMainWindow):
 
         w_preview_render.clicked.connect(lambda: toggle_preview_render())
 
+        # [check] Marker Render
+        self.w_marker_render = w_marker_render = qtw.QCheckBox("Marker Render")
+        w_vBoxLayout.addWidget(w_marker_render)
+
+        def toggle_marker_render():
+            preset.marker_render = w_marker_render.isChecked()
+            self.update_list.emit(False)
+
+        w_marker_render.clicked.connect(lambda: toggle_marker_render())
+
         # [check] Selective Render
         self.w_selective = w_selective = qtw.QCheckBox("Selective Render")
         w_vBoxLayout.addWidget(w_selective)
@@ -825,7 +838,7 @@ class MainWindow(qtw.QMainWindow):
             if not project.active:
                 continue
 
-            frames = len(project.get_frames_list())
+            frames = len(project.get_frames_list(marker_render=preset.marker_render))
 
             if project_frames is None:
                 project_frames = frames
