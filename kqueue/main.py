@@ -572,16 +572,6 @@ class MainWindow(qtw.QMainWindow):
 
         w_preview_render.clicked.connect(lambda: toggle_preview_render())
 
-        # [check] Marker Render
-        self.w_marker_render = w_marker_render = qtw.QCheckBox("Marker Render")
-        w_vBoxLayout.addWidget(w_marker_render)
-
-        def toggle_marker_render():
-            preset.marker_render = w_marker_render.isChecked()
-            self.update_list.emit(False)
-
-        w_marker_render.clicked.connect(lambda: toggle_marker_render())
-
         # [check] Selective Render
         self.w_selective = w_selective = qtw.QCheckBox("Selective Render")
         w_vBoxLayout.addWidget(w_selective)
@@ -592,6 +582,16 @@ class MainWindow(qtw.QMainWindow):
             self.update_widgets.emit()
 
         w_selective.clicked.connect(lambda: toggle_selective())
+
+        # [check] Marker Render
+        self.w_marker_render = w_marker_render = qtw.QCheckBox("Marker Render")
+        w_vBoxLayout.addWidget(w_marker_render)
+
+        def toggle_marker_render():
+            preset.marker_render = w_marker_render.isChecked()
+            self.update_list.emit(False)
+
+        w_marker_render.clicked.connect(lambda: toggle_marker_render())
 
         # [check] Assign sRGB
         self.w_assign_srgb = w_assign_srgb = qtw.QCheckBox("Save as sRGB")
@@ -861,6 +861,7 @@ class MainWindow(qtw.QMainWindow):
             self.w_selective.setEnabled(False)
             self.w_assign_srgb.setEnabled(False)
             self.w_preview_render.setEnabled(False)
+            self.w_marker_render.setEnabled(False)
 
         else:
             self.w_locateSave.setEnabled(True)
@@ -869,6 +870,7 @@ class MainWindow(qtw.QMainWindow):
             self.w_selective.setEnabled(True)
             self.w_assign_srgb.setEnabled(True)
             self.w_preview_render.setEnabled(True)
+            self.w_marker_render.setEnabled(True)
 
         self.w_openFolder.setEnabled(bool(preset.blender_exe))
 
