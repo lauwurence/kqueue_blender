@@ -42,6 +42,9 @@ DEFLICKER_MODE = 'pm'
 input_file = Path(argv[1])
 output_file = Path(f'{input_file.stem}.webm')
 
+if input_file.resolve() == output_file.resolve():
+    output_file = Path(f'{input_file.stem} 2.webm')
+
 
 ################################################################################
 # Functions

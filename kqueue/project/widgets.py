@@ -58,22 +58,26 @@ class QBlendProject(qtw.QWidget):
             self.w_hBoxLayout = qtw.QHBoxLayout()
             self.w_vBoxLayout.addLayout(self.w_hBoxLayout)
 
-            # [label]
+            # [label] Frames
             self.w_frames = qtw.QLabel()
             self.w_hBoxLayout.addWidget(self.w_frames)
 
-            # [label]
+            # [label] Samples
             self.w_samples = qtw.QLabel()
             self.w_hBoxLayout.addWidget(self.w_samples)
 
-            # [label]
+            # [label] Camera
             self.w_camera = qtw.QLabel()
             self.w_hBoxLayout.addWidget(self.w_camera)
 
-            # [label] Render Filepath
+            # [label] Output
             self.w_render_filepath = qtw.QLabel()
             self.w_hBoxLayout.addWidget(self.w_render_filepath, Qt.AlignLeft)
 
+            # [button] Reload
+            # self.w_shutdown = qtw.QPushButton("Reload")#, clicked=lambda: preset.shutdown())
+            # self.w_shutdown.setFixedWidth(40)
+            # self.w_hBoxLayout.addWidget(self.w_shutdown, Qt.AlignRight)
 
     def set_filename(self, filename):
         self.w_filename.setText(filename)
@@ -266,7 +270,7 @@ class QBlendProjectSettings(qtw.QWidget):
         """
         """
 
-        self.wResult_setText.emit(f'{self.project.get_frames_list(store.preset.marker_render)}')
+        self.wResult_setText.emit(f'{self.project.get_frames_list()}')
         # print(f'{self.project.get_frames_list()}')
         # self.w_result.setText(f'{self.project.get_frames_list()}')
 

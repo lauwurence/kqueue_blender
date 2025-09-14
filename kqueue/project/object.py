@@ -124,3 +124,9 @@ class BlendProject():
     def get_denoising_use_gpu(self): return self.get(self.denoising_use_gpu_override, self.denoising_use_gpu)
     def get_denoising_input_passes(self): return self.get(self.denoising_input_passes_override, self.denoising_input_passes)
     def get_denoising_prefilter(self): return self.get(self.denoising_prefilter_override, self.denoising_prefilter)
+
+
+    # def reload(self):
+    #     """
+    #     """
+

@@ -3,6 +3,7 @@
 
 from pickle import dump, load
 from json import dumps
+from pathlib import Path
 from . import store
 
 
@@ -11,25 +12,46 @@ def load_file(filename):
     Load file.
     """
 
-    try:
-        with open(filename, 'rb') as f:
-            version = load(f)
-            data = load(f)
+    file = Path(filename)
+    version = None
+    data = None
 
-    except:
-        version = None
-        data = None
-        store.mw.log.emit(f'Unable to load file: {filename}')
+    if file.exists():
+
+        try:
+            with open(file, 'rb') as f:
+                version = load(f)
+                data = load(f)
+
+        except:
+            store.mw.log.emit(f'Unable to load file: {file.resolve()}')
+
+    else:
+        store.mw.log.emit(f'File does not exist: {file.resolve()}')
 
     return version, data
 
 
-def save_file(data, filename, version):
+def save_file(data, filename, version, backup=True):
     """
     Save file.
+
+    `backup` - create a backup file with a "1" suffix.
     """
 
-    with open(filename, 'wb') as f:
+    file = Path(filename)
+
+    if backup:
+
+        if file.exists():
+            file_backup = Path(str(file) + "1")
+
+            if file_backup.exists():
+                file_backup.unlink()
+
+            file.rename(file_backup)
+
+    with open(file, 'wb') as f:
         dump(version, f)
         dump(data, f)
 
@@ -40,8 +62,10 @@ def load_cache(otherwise=None):
     """
 
     try:
+
         with open(store.cache_file, 'r') as f:
             data = load(f)
+
         return data
 
     except:

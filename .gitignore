@@ -15,3 +15,7 @@ saves/
 # Files
 test.py
 cache.json
+*.log
+*.mkv
+*.jpg
+*.gif

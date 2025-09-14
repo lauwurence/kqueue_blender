@@ -239,21 +239,23 @@ class QueuePreset():
         self.need_save(False)
 
 
-    def load_from(self):
+    def load_from(self, filename=None):
         """
         Load save from...
         """
 
-        if self.filename and False:
-            path = self.filename
-        else:
-            path = join(store.working_dir, SAVE_FOLDER)
-            makedirs(path, exist_ok=True)
+        if filename is None:
 
-        filename, _ = qtw.QFileDialog.getOpenFileName(mw, 'Load', path, "kQueue Project (*.kqp)")
+            if self.filename and False:
+                path = self.filename
+            else:
+                path = join(store.working_dir, SAVE_FOLDER)
+                makedirs(path, exist_ok=True)
 
-        if not filename:
-            return
+            filename, _ = qtw.QFileDialog.getOpenFileName(mw, 'Load', path, "kQueue Project (*.kqp)")
+
+            if not filename:
+                return
 
         from .save_load import load_file
         version, data = load_file(filename)
@@ -960,7 +962,8 @@ QListWidget {
 ############################################################################
 
 if DEV_MODE:
-    preset.set_blender("H:/Blender Foundation/blender-4.3.2/blender.exe")
+    preset.set_blender("H:/Blender Foundation/blender-4.5.2/blender.exe")
+    preset.load_from("F:/RenPy/00_Renders/kqueue_blender/kqueue/saves/05_Arriving.kqp")
     # preset.add_projects("I:/Blender Library/00_Parts/00_Intro/03_HomeRoaming (old)/001.blend")
     #                     "I:/Blender Library/00_Parts/00_Intro/00_Inside/002_GuitarTuning.blend")
     # mw.update_widgets.emit()
