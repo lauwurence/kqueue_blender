@@ -21,73 +21,60 @@ class QBlendProject(qtw.QWidget):
 
         self.project = project
 
-        # [vbox]
-        self.w_vBoxLayout = qtw.QVBoxLayout()
-        self.setLayout(self.w_vBoxLayout)
+        # [hbox]
+        self.w_hBoxLayout = qtw.QHBoxLayout()
+        self.setLayout(self.w_hBoxLayout)
 
-        if True:
+        # [check] Active
+        self.w_active = qtw.QCheckBox()
+        self.w_hBoxLayout.addWidget(self.w_active)
 
-            # [hbox]
-            self.w_hBoxLayout = qtw.QHBoxLayout()
-            self.w_vBoxLayout.addLayout(self.w_hBoxLayout)
+        def toggle_active():
+            project.active = self.w_active.isChecked()
+            store.mw.update_list.emit(False)
+            store.mw.update_widgets.emit()
 
-            # [check] Active
-            self.w_active = qtw.QCheckBox()
-            self.w_hBoxLayout.addWidget(self.w_active)
+        self.w_active.clicked.connect(lambda: toggle_active())
+        self.w_active.setStyleSheet("""
+            QCheckBox::indicator {
+                width : 12;
+                height : 12;
+            }
+        """)
 
-            def toggle_active():
-                project.active = self.w_active.isChecked()
-                store.mw.update_list.emit(False)
-                store.mw.update_widgets.emit()
+        # [label] Blend Filename
+        self.w_filename = qtw.QLabel()
+        self.w_hBoxLayout.addWidget(self.w_filename)
 
-            self.w_active.clicked.connect(lambda: toggle_active())
-            self.w_active.setStyleSheet("""
-                QCheckBox::indicator {
-                    width : 12;
-                    height : 12;
-                }
-            """)
+        # [label] Frames
+        self.w_frames = qtw.QLabel()
+        self.w_hBoxLayout.addWidget(self.w_frames)
 
-            # [label] Blend Filename
-            self.w_filename = qtw.QLabel()
-            self.w_hBoxLayout.addWidget(self.w_filename, Qt.AlignLeft)
+        # [label] Samples
+        self.w_samples = qtw.QLabel()
+        self.w_hBoxLayout.addWidget(self.w_samples)
 
-            # [button] Reload
-            if self.project.is_valid():
-                self.w_shutdown = qtw.QPushButton("R", clicked=lambda: self.project.reload())
-                self.w_shutdown.setFixedWidth(28)
-                self.w_hBoxLayout.addWidget(self.w_shutdown, Qt.AlignRight)
+        # [label] Camera
+        self.w_camera = qtw.QLabel()
+        self.w_hBoxLayout.addWidget(self.w_camera)
 
-            else:
-                self.w_is_invalid = qtw.QLabel("Does not exist!")
-                self.w_is_invalid.setFixedWidth(75)
-                self.w_hBoxLayout.addWidget(self.w_is_invalid, Qt.AlignRight)
+        # [label] Output
+        self.w_render_filepath = qtw.QLabel()
+        self.w_hBoxLayout.addWidget(self.w_render_filepath, Qt.AlignLeft)
 
-        if True:
+        # [button] Reload
+        if self.project.is_valid():
+            self.w_shutdown = qtw.QPushButton("R", clicked=lambda: self.project.reload())
+            self.w_shutdown.setFixedWidth(28)
+            self.w_hBoxLayout.addWidget(self.w_shutdown)
 
-            # [hbox]
-            self.w_hBoxLayout = qtw.QHBoxLayout()
-            self.w_vBoxLayout.addLayout(self.w_hBoxLayout)
-
-            # [label] Frames
-            self.w_frames = qtw.QLabel()
-            self.w_hBoxLayout.addWidget(self.w_frames)
-
-            # [label] Samples
-            self.w_samples = qtw.QLabel()
-            self.w_hBoxLayout.addWidget(self.w_samples)
-
-            # [label] Camera
-            self.w_camera = qtw.QLabel()
-            self.w_hBoxLayout.addWidget(self.w_camera)
-
-            # [label] Output
-            self.w_render_filepath = qtw.QLabel()
-            self.w_hBoxLayout.addWidget(self.w_render_filepath, Qt.AlignLeft)
-
+        else:
+            self.w_is_invalid = qtw.QLabel("Does not exist!")
+            self.w_is_invalid.setFixedWidth(75)
+            self.w_hBoxLayout.addWidget(self.w_is_invalid)
 
     def set_filename(self, filename):
-        self.w_filename.setText(filename)
+        self.w_filename.setText(f'[{filename}]')
 
     def get_filename(self):
         return self.w_filename.text() or None
@@ -96,7 +83,7 @@ class QBlendProject(qtw.QWidget):
         self.w_active.setChecked(value)
 
     def set_frames(self, frames):
-        self.w_frames.setText(f'Frames: [{frames}]')
+        self.w_frames.setText(f'| Frames: [{frames}]')
 
     def set_samples(self, samples):
         self.w_samples.setText(f'| Samples: {samples}')
