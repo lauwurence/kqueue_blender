@@ -5,6 +5,7 @@ import subprocess
 import webbrowser
 import threading
 
+from pathlib import Path
 from os import getenv
 from os.path import join as os_path_join
 from os.path import normpath, isdir, isfile
@@ -14,6 +15,13 @@ def join(*args):
     """
     """
     return normpath(os_path_join(*args).replace("\\", "/"))
+
+
+def exists(filename):
+    """
+    """
+
+    return Path(filename).exists()
 
 
 FILEBROWSER_PATH = join(getenv('WINDIR'), 'explorer.exe')

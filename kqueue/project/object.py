@@ -4,7 +4,7 @@
 from pathlib import Path
 
 from ..utils.filter_frames import filter_frames
-from ..utils.path import join
+from ..utils.path import join, exists
 from ..config import *
 from .. import store
 
@@ -51,6 +51,16 @@ class BlendProject():
         self.denoising_input_passes, self.denoising_input_passes_override = denoising_input_passes, None
         self.denoising_prefilter, self.denoising_prefilter_override = denoising_prefilter, None
         self.markers = markers
+
+
+    def is_valid(self):
+        """
+        """
+
+        if not self.file:
+            return False
+
+        return exists(self.file)
 
 
     def get_frames(self):
@@ -126,7 +136,12 @@ class BlendProject():
     def get_denoising_prefilter(self): return self.get(self.denoising_prefilter_override, self.denoising_prefilter)
 
 
-    # def reload(self):
-    #     """
-    #     """
+    def reload(self):
+        """
+        Reload the project data.
+        """
 
+        if not self.file:
+            return
+
+        store.preset.add_projects(self.file)

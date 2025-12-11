@@ -41,9 +41,16 @@ class LoaderThread(qtc.QThread):
         for i, file in enumerate(files):
             mod_time = int(Path(file).stat().st_mtime)
 
-            # Skip already loaded blend files
-            if file in [ project.file for project in preset.project_list ]:
-                continue
+            # Update the project that already exists
+            project = None
+
+            for p in preset.project_list:
+
+                if file != p.file:
+                    continue
+
+                project = p
+                break
 
             if not at_least_one:
                 print("------------------------")
@@ -95,7 +102,7 @@ blender "{file}" --factory-startup --background  --python "{store.get_data_py.re
                 save_load.save_cache(cache)
 
             # Unpack project data
-            project = BlendProject(
+            loaded_project = BlendProject(
                 file,
                 frame_start=data['frame_start'],
                 frame_end=data['frame_end'],
@@ -115,7 +122,33 @@ blender "{file}" --factory-startup --background  --python "{store.get_data_py.re
                 markers=data.get('markers', []),
             )
 
-            preset.project_list.append(project)
+            if project is None:
+                preset.project_list.append(loaded_project)
+
+            else:
+                for name in [
+                    'frames',
+                    'scene',
+                    'scene_list',
+                    'camera',
+                    'camera_list',
+                    'use_persistent_data',
+                    'render_filepath',
+                    'file_format',
+                    'use_adaptive_sampling',
+                    'samples',
+                    'denoiser',
+                    'denoising_use_gpu',
+                    'denoising_input_passes',
+                    'denoising_prefilter',
+                    'markers',
+                ]:
+
+                    if not hasattr(loaded_project, name):
+                        continue
+
+                    setattr(project, name, getattr(loaded_project, name))
+
             mw.update_list.emit(False)
             mw.update_widgets.emit()
             at_least_one = True

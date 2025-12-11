@@ -52,6 +52,17 @@ class QBlendProject(qtw.QWidget):
             self.w_filename = qtw.QLabel()
             self.w_hBoxLayout.addWidget(self.w_filename, Qt.AlignLeft)
 
+            # [button] Reload
+            if self.project.is_valid():
+                self.w_shutdown = qtw.QPushButton("R", clicked=lambda: self.project.reload())
+                self.w_shutdown.setFixedWidth(28)
+                self.w_hBoxLayout.addWidget(self.w_shutdown, Qt.AlignRight)
+
+            else:
+                self.w_is_invalid = qtw.QLabel("Does not exist!")
+                self.w_is_invalid.setFixedWidth(75)
+                self.w_hBoxLayout.addWidget(self.w_is_invalid, Qt.AlignRight)
+
         if True:
 
             # [hbox]
@@ -74,10 +85,6 @@ class QBlendProject(qtw.QWidget):
             self.w_render_filepath = qtw.QLabel()
             self.w_hBoxLayout.addWidget(self.w_render_filepath, Qt.AlignLeft)
 
-            # [button] Reload
-            # self.w_shutdown = qtw.QPushButton("Reload")#, clicked=lambda: preset.shutdown())
-            # self.w_shutdown.setFixedWidth(40)
-            # self.w_hBoxLayout.addWidget(self.w_shutdown, Qt.AlignRight)
 
     def set_filename(self, filename):
         self.w_filename.setText(filename)

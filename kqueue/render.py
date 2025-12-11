@@ -253,7 +253,8 @@ class RenderListenThread(qtc.QThread):
                     self.gProgressETA_setText.emit(f'Elapsed: {h:02.0f}:{m:02.0f}:{s:02.0f} | AVG: {avg_h:02.0f}:{avg_m:02.0f}:{avg_s:02.0f} | ETA: {eta_h:02.0f}:{eta_m:02.0f}:{eta_s:02.0f}')
 
                     # Change project
-                    found = search(r'--background ["](.*?.blend)["].*?-f ["](.*?)["]', line)
+                    found = search(r'(?:.*)--background ["](.*?.blend)["].*?-f ["](.*?)["]', line)
+
                     if found:
                         file = found.group(1)
                         frames = found.group(2)
@@ -292,7 +293,8 @@ class RenderListenThread(qtc.QThread):
                         continue
 
                     # Local progress <100%
-                    found = search(r'Rendered (\d+)/(\d+) Tiles, Sample (\d+)/(\d+)', line)
+                    found = search(r'(?:.*)Rendered (\d+)/(\d+) Tiles, Sample (\d+)/(\d+)', line)
+
                     if found:
                         tile = int(found.group(1))
                         tiles = int(found.group(2))
@@ -305,7 +307,8 @@ class RenderListenThread(qtc.QThread):
                         continue
 
                     # Progress 100%
-                    found = search(r'Saved: [\'|"](.*?)[\'|"]', line)
+                    found = search(r'(?:.*)Saved: [\'|\"](.*?)[\'|\"]', line)
+
                     if found:
                         file = found.group(1)
                         preset.renders_list.append(file)
@@ -322,10 +325,10 @@ class RenderListenThread(qtc.QThread):
                         continue
 
                     # Progress
-                    found = search(r'Fra:(\d+) Mem', line)
+                    found = search(r'(?:.*)Rendering single frame \(frame (\d+)\)', line)
+
                     if found:
-                        fra = int(found.group(1))
-                        preset.frame_flag = fra
+                        preset.frame_flag = int(found.group(1))
 
                         if preset.frame_flag != preset.last_frame_flag:
                             preset.last_frame_flag = preset.frame_flag

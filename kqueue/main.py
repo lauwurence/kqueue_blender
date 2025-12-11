@@ -596,14 +596,14 @@ class MainWindow(qtw.QMainWindow):
         w_marker_render.clicked.connect(lambda: toggle_marker_render())
 
         # [check] Assign sRGB
-        self.w_assign_srgb = w_assign_srgb = qtw.QCheckBox("Save as sRGB")
-        w_vBoxLayout.addWidget(w_assign_srgb)
+        # self.w_assign_srgb = w_assign_srgb = qtw.QCheckBox("Save as sRGB")
+        # w_vBoxLayout.addWidget(w_assign_srgb)
 
-        def toggle_assign_srgb():
-            preset.assign_srgb = w_assign_srgb.isChecked()
-            self.update_list.emit(False)
+        # def toggle_assign_srgb():
+        #     preset.assign_srgb = w_assign_srgb.isChecked()
+        #     self.update_list.emit(False)
 
-        w_assign_srgb.clicked.connect(lambda: toggle_assign_srgb())
+        # w_assign_srgb.clicked.connect(lambda: toggle_assign_srgb())
 
 
         # ! [hbox] Start and Stop Render
@@ -861,7 +861,7 @@ class MainWindow(qtw.QMainWindow):
             self.w_locateLoad.setEnabled(False)
             self.w_locateBlender.setEnabled(False)
             self.w_selective.setEnabled(False)
-            self.w_assign_srgb.setEnabled(False)
+            # self.w_assign_srgb.setEnabled(False)
             self.w_preview_render.setEnabled(False)
             self.w_marker_render.setEnabled(False)
 
@@ -870,7 +870,7 @@ class MainWindow(qtw.QMainWindow):
             self.w_locateLoad.setEnabled(True)
             self.w_locateBlender.setEnabled(True)
             self.w_selective.setEnabled(True)
-            self.w_assign_srgb.setEnabled(True)
+            # self.w_assign_srgb.setEnabled(True)
             self.w_preview_render.setEnabled(True)
             self.w_marker_render.setEnabled(True)
 
@@ -884,7 +884,7 @@ class MainWindow(qtw.QMainWindow):
         self.w_openRenderFolder.setEnabled(bool(preset.renders_list))
 
         self.w_selective.setChecked(bool(preset.selective_render))
-        self.w_assign_srgb.setChecked(bool(preset.assign_srgb))
+        # self.w_assign_srgb.setChecked(bool(preset.assign_srgb))
         self.w_preview_render.setChecked(bool(preset.preview_render))
 
 
@@ -962,8 +962,8 @@ QListWidget {
 ############################################################################
 
 if DEV_MODE:
-    preset.set_blender("H:/Blender Foundation/blender-4.5.2/blender.exe")
-    preset.load_from("F:/RenPy/00_Renders/kqueue_blender/kqueue/saves/05_Arriving.kqp")
+    preset.load_from("F:/RenPy/00_Renders/kqueue_blender/kqueue/saves/test.kqp")
+    preset.set_blender("H:/Blender Foundation/blender-5.0.0/blender.exe")
     # preset.add_projects("I:/Blender Library/00_Parts/00_Intro/03_HomeRoaming (old)/001.blend")
     #                     "I:/Blender Library/00_Parts/00_Intro/00_Inside/002_GuitarTuning.blend")
     # mw.update_widgets.emit()
