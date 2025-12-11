@@ -1,6 +1,7 @@
 ################################################################################
 ## Project Object
 
+import os
 from pathlib import Path
 
 from ..utils.filter_frames import filter_frames
@@ -141,7 +142,22 @@ class BlendProject():
         Reload the project data.
         """
 
-        if not self.file:
+        if not self.is_valid():
             return
 
+        print(f'Reloading: {self.file}')
+
         store.preset.add_projects(self.file)
+
+
+    def open_file(self):
+        """
+        Open project file.
+        """
+
+        if not self.is_valid():
+            return
+
+        print(f'Starting: {self.file}')
+
+        os.startfile(self.file)

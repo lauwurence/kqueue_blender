@@ -62,10 +62,18 @@ class QBlendProject(qtw.QWidget):
         self.w_render_filepath = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_render_filepath, Qt.AlignLeft)
 
-        # [button] Reload
         if self.project.is_valid():
-            self.w_shutdown = qtw.QPushButton("R", clicked=lambda: self.project.reload())
-            self.w_shutdown.setFixedWidth(28)
+
+            # [button] Start
+            self.w_open = qtw.QPushButton("", clicked=lambda: self.project.open_file())
+            self.w_open.setIcon(qtg.QIcon('kqueue/icons/start_project.svg'))
+            self.w_open.setFixedWidth(24)
+            self.w_hBoxLayout.addWidget(self.w_open)
+
+            # [button] Reload
+            self.w_shutdown = qtw.QPushButton("", clicked=lambda: self.project.reload())
+            self.w_shutdown.setIcon(qtg.QIcon('kqueue/icons/reload_project.svg'))
+            self.w_shutdown.setFixedWidth(24)
             self.w_hBoxLayout.addWidget(self.w_shutdown)
 
         else:
