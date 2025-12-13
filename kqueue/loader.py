@@ -63,7 +63,7 @@ class LoaderThread(qtc.QThread):
 
             # Get project data
             else:
-                main.log(f'({i + 1}/{len(files)}) Opening project: {file}')
+                main.log(f'({i + 1}/{len(files)}) Reading project: {file}')
 
                 BATCH = f"""
 @CHCP 65001 > NUL
@@ -154,7 +154,7 @@ blender "{file}" --factory-startup --background  --python "{store.get_data_py.re
             at_least_one = True
 
         if at_least_one:
-            preset.need_save()
+            preset.set_need_save()
             main.log(f'All projects loaded!')
 
         preset.is_adding_projects = False

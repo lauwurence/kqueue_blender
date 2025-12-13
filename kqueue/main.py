@@ -107,7 +107,7 @@ class QueuePreset():
         return sum([ len(p.get_frames_list()) for p in self.project_list if p.active ])
 
 
-    def need_save(self, value=True):
+    def set_need_save(self, value=True):
         """
         Does the project need saving?
         """
@@ -199,7 +199,7 @@ class QueuePreset():
         mw.w_pathToBlender.setText(filename)
 
         log(f'Blender: {filename}')
-        self.need_save()
+        self.set_need_save()
 
 
     def save(self):
@@ -213,7 +213,7 @@ class QueuePreset():
         save_file([self.project_list, self.blender_exe], self.filename, version=1)
 
         self.set_save(self.filename)
-        self.need_save(False)
+        self.set_need_save(False)
 
 
     def save_as(self):
@@ -236,7 +236,7 @@ class QueuePreset():
         save_file([self.project_list, self.blender_exe], filename, version=1)
 
         self.set_save(filename)
-        self.need_save(False)
+        self.set_need_save(False)
 
 
     def load_from(self, filename=None):
@@ -268,7 +268,7 @@ class QueuePreset():
             self.set_blender(blender_exe)
 
         self.set_save(filename)
-        self.need_save(False)
+        self.set_need_save(False)
 
         mw.update_list.emit(False)
 
@@ -742,7 +742,7 @@ class MainWindow(qtw.QMainWindow):
 
     def dropEvent(self, event):
         """
-        Add project.
+        Load projects on drag and drop.
         """
 
         files = [ url.toLocalFile() for url in event.mimeData().urls() ]
@@ -776,6 +776,7 @@ class MainWindow(qtw.QMainWindow):
 
     def __update_title(self):
         """
+        Update title.
         """
 
         title = TITLE if not DEV_MODE else APPID
@@ -801,6 +802,9 @@ class MainWindow(qtw.QMainWindow):
         """
         Update list widget and `preset.project_list` list.
         """
+
+        old_value = self.w_listOfProjects.verticalScrollBar().value()
+        old_files = [ p.file for p in preset.project_list ]
 
         # Sync variable with the list widget
         if sync:
@@ -852,6 +856,19 @@ class MainWindow(qtw.QMainWindow):
         self.w_gProgressBar.setValue(0)
         self.w_pProgressBar.setValue(0)
         self.w_rProgressBar.setValue(0)
+
+        # If list changed
+        new_files = [ p.file for p in preset.project_list ]
+
+        if old_files != new_files:
+            preset.set_need_save()
+
+        max_cycles = 1000
+
+        while self.w_listOfProjects.verticalScrollBar().value() != old_value and max_cycles > 0:
+            self.w_listOfProjects.verticalScrollBar().setValue(old_value)
+
+            max_cycles -= 1
 
 
     def __update_widgets(self):

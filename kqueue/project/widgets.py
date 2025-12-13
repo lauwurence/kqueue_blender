@@ -10,6 +10,8 @@ from ..utils.path import join
 from ..config import *
 from .. import store
 
+from pathlib import Path
+
 
 ################################################################################
 ## Project Item Widget
@@ -33,6 +35,7 @@ class QBlendProject(qtw.QWidget):
             project.active = self.w_active.isChecked()
             store.mw.update_list.emit(False)
             store.mw.update_widgets.emit()
+            store.preset.set_need_save()
 
         self.w_active.clicked.connect(lambda: toggle_active())
         self.w_active.setStyleSheet("""
@@ -78,11 +81,14 @@ class QBlendProject(qtw.QWidget):
 
         else:
             self.w_is_invalid = qtw.QLabel("Does not exist!")
+            self.w_is_invalid.setStyleSheet("color: red; font-weight: bold;")
             self.w_is_invalid.setFixedWidth(75)
             self.w_hBoxLayout.addWidget(self.w_is_invalid)
 
     def set_filename(self, filename):
-        self.w_filename.setText(f'[{filename}]')
+        path = Path(filename)
+        self.w_filename.setText(f'".../{path.name}"')
+        self.w_filename.setStyleSheet("font-weight: bold;")
 
     def get_filename(self):
         return self.w_filename.text() or None
@@ -121,7 +127,7 @@ class QBlendProjectSettings(qtw.QWidget):
         self.setWindowTitle("Project Settings")
         self.setWindowIcon(qtg.QIcon(ICON))
         self.setMinimumWidth(450)
-        self.setFixedHeight(450)
+        self.setFixedHeight(400)
         self.setWindowModality(Qt.ApplicationModal)
 
         # ! [vbox]
@@ -134,6 +140,7 @@ class QBlendProjectSettings(qtw.QWidget):
 
         self.label = qtw.QLabel(str(project.file))
         self.label.setFont(font)
+        self.label.setStyleSheet("font-weight: bold;")
         layout.addWidget(self.label, 0, Qt.AlignTop)
 
         # [form] Preset Override
@@ -298,7 +305,7 @@ class QBlendProjectSettings(qtw.QWidget):
                 return
 
             setattr(self.project, variable, value)
-            store.preset.need_save(True)
+            store.preset.set_need_save()
 
         set_value('frames_override', self.w_frames.text())
         set_value('samples_override', self.w_samples.text())
