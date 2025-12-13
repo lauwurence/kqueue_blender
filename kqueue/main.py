@@ -720,14 +720,19 @@ class MainWindow(qtw.QMainWindow):
         Handle key presses.
         """
 
+        if preset.is_status('RENDERING') or preset.is_status('RENDERING_STOPPING'):
+            return
+
         # Delete
         if event.key() == Qt.Key_Delete:
 
             if preset.project_list:
                 project = self.get_selected_project()
                 preset.project_list.remove(project)
+
                 self.update_list.emit(False)
                 self.update_widgets.emit()
+                preset.set_need_save()
 
 
     def get_selected_project(self):
@@ -972,6 +977,12 @@ QListWidget {
     border-radius: 6px;
     padding: 2px;
     font-size: 12px;
+}
+QListView::item:selected {
+    color: #448fff;
+    background-color: rgb(255, 255, 255);
+    border: 1px solid #448fff;
+    border-radius: 4px;
 }
 ''')
 

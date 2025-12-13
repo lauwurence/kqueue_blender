@@ -382,6 +382,12 @@ class RenderListenThread(qtc.QThread):
                 padding: 2px;
                 font-size: 12px;
             }
+            QListView::item:selected {
+                color: #448fff;
+                background-color: rgb(255, 255, 255);
+                border: 1px solid #448fff;
+                border-radius: 4px;
+            }
         """)
 
         monitor.screen_on()
