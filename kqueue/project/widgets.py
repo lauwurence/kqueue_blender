@@ -58,8 +58,8 @@ class QBlendProject(qtw.QWidget):
         self.w_hBoxLayout.addWidget(self.w_samples)
 
         # [label] Camera
-        self.w_camera = qtw.QLabel()
-        self.w_hBoxLayout.addWidget(self.w_camera)
+        # self.w_camera = qtw.QLabel()
+        # self.w_hBoxLayout.addWidget(self.w_camera)
 
         # [label] Output
         self.w_render_filepath = qtw.QLabel()
@@ -102,8 +102,8 @@ class QBlendProject(qtw.QWidget):
     def set_samples(self, samples):
         self.w_samples.setText(f'| Samples: {samples}')
 
-    def set_camera(self, camera):
-        self.w_camera.setText(f'| Camera: "{camera}"')
+    # def set_camera(self, camera):
+    #     self.w_camera.setText(f'| Camera: "{camera}"')
 
     def set_render_filepath(self, filepath):
         self.w_render_filepath.setText(f'| Output: "{filepath}"')

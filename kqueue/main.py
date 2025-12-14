@@ -832,7 +832,7 @@ class MainWindow(qtw.QMainWindow):
             w_project.set_active(project.active)
             w_project.set_frames(project.get_frames())
             w_project.set_samples(project.get_samples())
-            w_project.set_camera(project.camera)
+            # w_project.set_camera(project.camera)
             w_project.set_render_filepath(project.get_render_filepath())
 
             item = qtw.QListWidgetItem(self.w_listOfProjects)
