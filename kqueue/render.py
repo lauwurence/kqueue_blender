@@ -327,6 +327,9 @@ class RenderListenThread(qtc.QThread):
                     # Progress
                     found = search(r'(?:.*)Rendering single frame \(frame (\d+)\)', line)
 
+                    if not found:
+                        found = search(r'(?:.*)Rendering frame (\d+)', line)
+
                     if found:
                         preset.frame_flag = int(found.group(1))
 
