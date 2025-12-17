@@ -33,7 +33,7 @@ class LoaderThread(qtc.QThread):
         mw.update_widgets.emit()
 
         # Load cache
-        cache = save_load.load_cache(otherwise={})
+        cache = save_load.load_cache()
 
         files = [ join(file) for file in self.files if file.endswith(".blend")]
         at_least_one = False
@@ -96,9 +96,9 @@ blender "{file}" --factory-startup --background  --python "{store.get_data_py.re
 
                 # Write cache project data
                 data['mod_time'] = mod_time
-                cache[file] = data
 
                 # Update cache
+                cache[file] = data
                 save_load.save_cache(cache)
 
             # Unpack project data
@@ -120,6 +120,7 @@ blender "{file}" --factory-startup --background  --python "{store.get_data_py.re
                 denoising_input_passes=data['denoising_input_passes'],
                 denoising_prefilter=data['denoising_prefilter'],
                 markers=data.get('markers', []),
+                mod_time=mod_time,
             )
 
             if project is None:
@@ -142,6 +143,7 @@ blender "{file}" --factory-startup --background  --python "{store.get_data_py.re
                     'denoising_input_passes',
                     'denoising_prefilter',
                     'markers',
+                    'mod_time',
                 ]:
 
                     if not hasattr(loaded_project, name):

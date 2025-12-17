@@ -7,7 +7,7 @@ from pathlib import Path
 from ..utils.filter_frames import filter_frames
 from ..utils.path import join, exists
 from ..config import *
-from .. import store
+from .. import store, save_load
 
 
 class BlendProject():
@@ -16,6 +16,7 @@ class BlendProject():
     file_format = 'PNG'
     file_format_override = None
     markers = []
+    mod_time = None
 
     def __init__(self,
                  file,
@@ -34,7 +35,8 @@ class BlendProject():
                  denoising_use_gpu,
                  denoising_input_passes,
                  denoising_prefilter,
-                 markers):
+                 markers,
+                 mod_time):
         self.active = True
         self.file = file if file else None
         self.frames, self.frames_override = f"{frame_start}-{frame_end}", None
@@ -52,9 +54,10 @@ class BlendProject():
         self.denoising_input_passes, self.denoising_input_passes_override = denoising_input_passes, None
         self.denoising_prefilter, self.denoising_prefilter_override = denoising_prefilter, None
         self.markers = markers
+        self.mod_time = mod_time
 
 
-    def is_valid(self):
+    def file_exists(self):
         """
         """
 
@@ -64,20 +67,46 @@ class BlendProject():
         return exists(self.file)
 
 
+    def is_outdated(self):
+        """
+        """
+
+        if not self.file_exists():
+            return True
+
+        cache = save_load.load_cache()
+
+        if cache is None:
+            return True
+
+        mod_time = int(Path(self.file).stat().st_mtime)
+
+        if self.file not in cache:
+            return True
+
+        if self.mod_time != mod_time:
+            return True
+
+        return False
+
+
     def get_frames(self):
         """
+        Get frames as a string.
         """
-        return self.get(self.frames_override, self.frames)
+
+        return self.get(self.frames_override, self.frames) or ""
 
 
     def get_markers(self):
         """
+        Get markers as a string.
         """
 
         if not self.markers:
             return ""
 
-        return ",".join([ str(m) for m in self.markers])
+        return ",".join([ str(m) for m in self.markers]) or ""
 
 
     def get_frames_list(self):
@@ -103,7 +132,7 @@ class BlendProject():
         if store.preset.selective_render:
             rv = []
 
-            for frame in filter_frames(frames):
+            for frame in filter_frames(frames) or []:
                 filepath = self.get_render_filepath()
                 dir, basename = filepath.rsplit("\\", 1)
                 zeros = basename.count("#") or 4
@@ -142,7 +171,7 @@ class BlendProject():
         Reload the project data.
         """
 
-        if not self.is_valid():
+        if not self.file_exists():
             return
 
         print(f'Reloading: {self.file}')
@@ -155,7 +184,7 @@ class BlendProject():
         Open project file.
         """
 
-        if not self.is_valid():
+        if not self.file_exists():
             return
 
         print(f'Starting: {self.file}')

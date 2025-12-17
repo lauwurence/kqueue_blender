@@ -29,7 +29,7 @@ def main():
             'scene' : 'scene.name',
             'scene_list' : 'bpy.data.scenes.keys()',
             'camera' : 'scene.camera.name if scene.camera else None',
-            'camera_list' : '[obj.name for obj in bpy.data.objects if obj.type == "CAMERA"]',
+            'camera_list' : 'bpy.data.cameras.keys()',
             'render_filepath' : 'render.filepath',
             'file_format' : 'render.image_settings.file_format',
             'use_persistent_data' : 'render.use_persistent_data',
@@ -45,10 +45,6 @@ def main():
         markers = []
 
         for marker in scene.timeline_markers:
-
-            if not marker.name.startswith("F_"):
-                continue
-
             markers.append(marker.frame)
 
         data['markers'] = markers
@@ -59,7 +55,7 @@ def main():
 
         raise Exception("Error fetching data.")
 
-    with open(bridge_file, 'w') as f: #encoding="utf-8"
+    with open(bridge_file, 'w') as f:
         f.write(json.dumps(data, indent=4))
 
     print("Data fetched successfully.")

@@ -65,7 +65,7 @@ class QBlendProject(qtw.QWidget):
         self.w_render_filepath = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_render_filepath, Qt.AlignLeft)
 
-        if self.project.is_valid():
+        if self.project.file_exists():
 
             # [button] Start
             self.w_open = qtw.QPushButton("", clicked=lambda: self.project.open_file())
@@ -73,17 +73,19 @@ class QBlendProject(qtw.QWidget):
             self.w_open.setFixedWidth(24)
             self.w_hBoxLayout.addWidget(self.w_open)
 
-            # [button] Reload
-            self.w_shutdown = qtw.QPushButton("", clicked=lambda: self.project.reload())
-            self.w_shutdown.setIcon(qtg.QIcon('kqueue/icons/reload_project.svg'))
-            self.w_shutdown.setFixedWidth(24)
-            self.w_hBoxLayout.addWidget(self.w_shutdown)
+            if self.project.is_outdated():
+
+                # [button] Reload
+                self.w_reload = qtw.QPushButton("", clicked=lambda: self.project.reload())
+                self.w_reload.setIcon(qtg.QIcon('kqueue/icons/reload_project.svg'))
+                self.w_reload.setFixedWidth(24)
+                self.w_hBoxLayout.addWidget(self.w_reload)
 
         else:
-            self.w_is_invalid = qtw.QLabel("Does not exist!")
-            self.w_is_invalid.setStyleSheet("color: red; font-weight: bold;")
-            self.w_is_invalid.setFixedWidth(75)
-            self.w_hBoxLayout.addWidget(self.w_is_invalid)
+            self.w_not_exists = qtw.QLabel("Does not exist!")
+            self.w_not_exists.setStyleSheet("color: red; font-weight: bold;")
+            self.w_not_exists.setFixedWidth(75)
+            self.w_hBoxLayout.addWidget(self.w_not_exists)
 
     def set_filename(self, filename):
         path = Path(filename)

@@ -1,8 +1,9 @@
 ################################################################################
 ## Save and Load kQueue Files
 
-from pickle import dump, load
-from json import dumps
+import json
+import pickle
+
 from pathlib import Path
 from . import store
 
@@ -20,8 +21,8 @@ def load_file(filename):
 
         try:
             with open(file, 'rb') as f:
-                version = load(f)
-                data = load(f)
+                version = pickle.load(f)
+                data = pickle.load(f)
 
         except:
             store.mw.log.emit(f'Unable to load file: {file.resolve()}')
@@ -52,24 +53,19 @@ def save_file(data, filename, version, backup=True):
             file.rename(file_backup)
 
     with open(file, 'wb') as f:
-        dump(version, f)
-        dump(data, f)
+        pickle.dump(version, f)
+        pickle.dump(data, f)
 
 
-def load_cache(otherwise=None):
+def load_cache():
     """
     Load cache file data.
     """
 
-    try:
+    with open(store.cache_file, 'r') as f:
+        data = json.load(f)
 
-        with open(store.cache_file, 'r') as f:
-            data = load(f)
-
-        return data
-
-    except:
-        return otherwise
+    return data
 
 
 def save_cache(data):
@@ -78,4 +74,4 @@ def save_cache(data):
     """
 
     with open(store.cache_file, 'w') as f:
-        f.write(dumps(data, indent=4))
+        f.write(json.dumps(data, indent=4))
