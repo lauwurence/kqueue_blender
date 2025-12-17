@@ -59,6 +59,7 @@ class BlendProject():
 
     def file_exists(self):
         """
+        Does the project file exist?
         """
 
         if not self.file:
@@ -69,6 +70,7 @@ class BlendProject():
 
     def is_outdated(self):
         """
+        Was the project updated after the last data fetch?
         """
 
         if not self.file_exists():
@@ -103,14 +105,17 @@ class BlendProject():
         Get markers as a string.
         """
 
-        if not self.markers:
+        markers = self.markers
+
+        if not markers:
             return ""
 
-        return ",".join([ str(m) for m in self.markers]) or ""
+        return ",".join([ str(m) for m in markers])
 
 
     def get_frames_list(self):
         """
+        Get frames as an int list.
         """
 
         format = self.get_file_format()
@@ -152,9 +157,16 @@ class BlendProject():
 
         return filter_frames(frames) or []
 
-    def get(self, v1, v2): return v2 if v1 is None else v1
-    def get_scene(self): return self.get(self.scene_override, self.scene)
-    def get_camera(self): return self.get(self.camera_override, self.camera)
+    def get(self, v1, v2, other_list=None):
+        rv = v1 if v1 is not None else v2
+
+        if other_list is not None and (rv not in other_list):
+            return other_list[0]
+
+        return rv
+
+    def get_scene(self): return self.get(self.scene_override, self.scene, self.scene_list)
+    def get_camera(self): return self.get(self.camera_override, self.camera, self.camera_list)
     def get_use_persistent_data(self): return self.get(self.use_persistent_data_override, self.use_persistent_data)
     def get_render_filepath(self): return join(self.get(self.render_filepath_override, self.render_filepath))
     def get_file_format(self): return self.get(self.file_format_override, self.file_format)

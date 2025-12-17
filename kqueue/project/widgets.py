@@ -320,16 +320,3 @@ class QBlendProjectSettings(qtw.QWidget):
         set_value('denoising_use_gpu_override', eval(self.w_denoiserUseGPU.text()))
         set_value('denoising_input_passes', self.w_denoiserInputPasses.currentText())
         set_value('denoising_prefilter', self.w_denoiserPrefilter.currentText())
-
-
-        # project.frames_override = self.w_frames.text()
-        # project.samples_override = self.w_samples.text()
-        # project.render_filepath_override = self.w_renderFilepath.text()
-        # project.camera_override = self.w_camera.currentText()
-        # project.scene_override = self.w_scene.currentText()
-        # project.use_persistent_data_override = eval(self.w_usePersistentData.text())
-        # project.use_adaptive_sampling_override = eval(self.w_useAdaptiveSampling.text())
-        # project.denoiser_override = self.w_denoiser.currentText()
-        # project.denoising_use_gpu_override = eval(self.w_denoiserUseGPU.text())
-        # project.denoising_input_passes = self.w_denoiserInputPasses.currentText()
-        # project.denoising_prefilter = self.w_denoiserPrefilter.currentText()

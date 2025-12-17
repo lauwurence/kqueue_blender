@@ -236,19 +236,20 @@ class RenderListenThread(qtc.QThread):
                     h, m = divmod(m, 60)
 
                     # Average time
-                    avg_time = sum(preset.render_avg_time) / max(1, len(preset.render_avg_time))
+                    avg_list = preset.render_avg_time[-3:]
+
+                    if avg_list:
+                        avg_time = sum(avg_list) / len(avg_list)
+                    else:
+                        avg_time = 0
+
                     avg_m, avg_s = divmod(avg_time, 60)
                     avg_h, avg_m = divmod(avg_m, 60)
 
                     # Estimated time
-                    eta_time = avg_time * (preset.get_global_frames_number() + 1 - preset.global_frame)
+                    eta_time = (preset.get_global_frames_number() + 1 - preset.global_frame) * avg_time
                     eta_m, eta_s = divmod(eta_time, 60)
                     eta_h, eta_m = divmod(eta_m, 60)
-
-                    # if not eta_time:
-                    #     # Local progress <100%
-                    #     found = search(r'Rendered (\d+)/(\d+) Tiles, Sample (\d+)/(\d+)', line)
-                    #     if found:
 
                     self.gProgressETA_setText.emit(f'Elapsed: {h:02.0f}:{m:02.0f}:{s:02.0f} | AVG: {avg_h:02.0f}:{avg_m:02.0f}:{avg_s:02.0f} | ETA: {eta_h:02.0f}:{eta_m:02.0f}:{eta_s:02.0f}')
 
@@ -312,7 +313,7 @@ class RenderListenThread(qtc.QThread):
                     if found:
                         file = found.group(1)
                         preset.renders_list.append(file)
-                        preset.render_avg_time.add(current_time - preset.render_start_time)
+                        preset.render_avg_time.append(current_time - preset.render_start_time)
                         preset.render_start_time = current_time
 
                         self.rProgressBar_setValue.emit(100)

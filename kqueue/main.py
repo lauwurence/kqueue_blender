@@ -128,7 +128,7 @@ class QueuePreset():
 
         self.global_render_start_time = time()
         self.render_start_time = time()
-        self.render_avg_time = set()
+        self.render_avg_time = []
         self.global_frames = sum([ len(p.get_frames_list()) for p in self.project_list if p.active ])
         self.global_frame = 0
         self.project_frames = 0
