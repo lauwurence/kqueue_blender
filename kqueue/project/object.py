@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 from ..utils.filter_frames import filter_frames
-from ..utils.path import join, exists
+from ..utils.path import join, exists, open_folder, open_image
 from ..config import *
 from .. import store, save_load
 
@@ -202,3 +202,66 @@ class BlendProject():
         print(f'Starting: {self.file}')
 
         os.startfile(self.file)
+
+
+    def get_render_output_image(self):
+        """
+        Get render output image.
+        """
+
+        path = Path(self.get_render_filepath())
+        dir = path.parent
+
+        if not dir.exists():
+            return None
+
+        rv = None
+
+        for local_path, _, files in dir.walk():
+
+            for name in files:
+
+                if not name.startswith(path.stem):
+                    continue
+
+                rv = local_path / name
+
+        return rv
+
+
+    def open_render_output_image(self):
+        """
+        """
+
+        path = self.get_render_output_image()
+
+        if not path:
+            return
+
+        open_image(path)
+
+
+    def get_render_output_folder(self):
+        """
+        Get render output fodler.
+        """
+
+        path = Path(self.get_render_filepath())
+        dir = path.parent
+
+        if not dir.exists():
+            return None
+
+        return path.parent
+
+
+    def open_render_output_folder(self):
+        """
+        """
+
+        path = self.get_render_output_folder()
+
+        if not path:
+            return
+
+        open_folder(path)

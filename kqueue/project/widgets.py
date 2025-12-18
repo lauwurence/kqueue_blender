@@ -63,7 +63,26 @@ class QBlendProject(qtw.QWidget):
 
         # [label] Output
         self.w_render_filepath = qtw.QLabel()
-        self.w_hBoxLayout.addWidget(self.w_render_filepath, Qt.AlignLeft)
+        self.w_hBoxLayout.addWidget(self.w_render_filepath)
+
+        # [label] Open Render Output Image
+        self.w_open_render_image = qtw.QPushButton("", clicked=lambda: self.project.open_render_output_image())
+        self.w_open_render_image.setIcon(qtg.QIcon('kqueue/icons/open_render.svg'))
+        self.w_open_render_image.setIconSize(qtc.QSize(14, 14))
+        self.w_open_render_image.setFixedWidth(24)
+        self.w_open_render_image.setFlat(True)
+        self.w_hBoxLayout.addWidget(self.w_open_render_image)
+
+        # [label] Open Render Output Folder
+        self.w_open_render_folder = qtw.QPushButton("", clicked=lambda: self.project.open_render_output_folder())
+        self.w_open_render_folder.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
+        self.w_open_render_folder.setIconSize(qtc.QSize(14, 14))
+        self.w_open_render_folder.setFixedWidth(24)
+        self.w_open_render_folder.setFlat(True)
+        self.w_hBoxLayout.addWidget(self.w_open_render_folder)
+
+        # [stretch]
+        self.w_hBoxLayout.addStretch()
 
         if self.project.file_exists():
 
@@ -109,6 +128,10 @@ class QBlendProject(qtw.QWidget):
 
     def set_render_filepath(self, filepath):
         self.w_render_filepath.setText(f'| Output: "{filepath}"')
+
+    def update_buttons(self):
+        self.w_open_render_image.setEnabled(bool(self.project.get_render_output_image()))
+        self.w_open_render_folder.setEnabled(bool(self.project.get_render_output_folder()))
 
 
 

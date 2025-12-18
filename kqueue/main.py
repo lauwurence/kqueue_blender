@@ -190,7 +190,10 @@ class QueuePreset():
         if not Path(filename).exists():
             self.blender_exe = None
             mw.w_pathToBlender.setText("Locate blender.exe first!")
+            mw.w_pathToBlender.setStyleSheet("color: red")
             return
+
+        mw.w_pathToBlender.setStyleSheet("")
 
         if filename == self.blender_exe:
             return
@@ -425,21 +428,22 @@ class MainWindow(qtw.QMainWindow):
 
         self.setWindowIcon(qtg.QIcon(ICON))
 
-        self.setMinimumWidth(1000)
+        self.setMinimumWidth(900)
         self.setMinimumHeight(600)
         self.setAcceptDrops(True)
         self.setAttribute(Qt.WA_DeleteOnClose)
 
-        # ! [widget]
+        # [widget]
         w = qtw.QWidget()
         self.setCentralWidget(w)
 
-        # ! [vbox]
+        # [vbox]
         w_vBoxLayout = qtw.QVBoxLayout()
         w.setLayout(w_vBoxLayout)
 
         if True:
-            # ! [hbox] Locate Blender Horizontal Box
+
+            # [hbox]
             w_hBoxLayout = qtw.QHBoxLayout()
             w_vBoxLayout.addLayout(w_hBoxLayout)
 
@@ -463,6 +467,11 @@ class MainWindow(qtw.QMainWindow):
             # w_locateLoad.setFixedWidth(100)
             w_hBoxLayout.addWidget(w_locateLoad)
 
+            # [edit] Path to Blender
+            self.w_pathToBlender = w_pathToBlender = qtw.QLineEdit("Locate blender.exe first!")
+            w_pathToBlender.setEnabled(False)
+            w_hBoxLayout.addWidget(w_pathToBlender)
+
             # [button] Locate Blender
             self.w_locateBlender = w_locateBlender = qtw.QPushButton("", clicked=lambda: preset.locate_blender())
             w_locateBlender.clicked.connect(lambda: self.update_widgets.emit())
@@ -471,16 +480,11 @@ class MainWindow(qtw.QMainWindow):
             # w_locateBlender.setFixedWidth(100)
             w_hBoxLayout.addWidget(w_locateBlender)
 
-            # [edit] Path to Blender
-            self.w_pathToBlender = w_pathToBlender = qtw.QLineEdit("Locate blender.exe first!")
-            w_pathToBlender.setEnabled(False)
-            w_hBoxLayout.addWidget(w_pathToBlender)
-
-            # [button] Locate Blender
-            self.w_openFolder = w_openFolder = qtw.QPushButton("Open Folder", clicked=lambda: open_folder(preset.blender_exe))
-            w_openFolder.setFixedWidth(100)
-            w_openFolder.setEnabled(False)
-            w_hBoxLayout.addWidget(w_openFolder)
+            # # [button] Locate Blender
+            # self.w_openFolder = w_openFolder = qtw.QPushButton("Open Folder", clicked=lambda: open_folder(preset.blender_exe))
+            # w_openFolder.setFixedWidth(100)
+            # w_openFolder.setEnabled(False)
+            # w_hBoxLayout.addWidget(w_openFolder)
 
         # [list] List of Projects
         def open_project_settings(self):
@@ -512,7 +516,8 @@ class MainWindow(qtw.QMainWindow):
         self.w_logOutput.setEnabled(False)
         w_vBoxLayout.addWidget(self.w_logOutput)
 
-        # ! [hbox] Global Progress
+
+        # [hbox]
         w_hBoxLayout = qtw.QHBoxLayout()
         w_vBoxLayout.addLayout(w_hBoxLayout)
 
@@ -528,7 +533,8 @@ class MainWindow(qtw.QMainWindow):
         # w_gProgressBar.setTextVisible(False)
         w_hBoxLayout.addWidget(w_gProgressBar)
 
-        # ! [hbox] Project Progress
+
+        # [hbox] Project Progress
         w_hBoxLayout = qtw.QHBoxLayout()
         w_vBoxLayout.addLayout(w_hBoxLayout)
 
@@ -545,7 +551,7 @@ class MainWindow(qtw.QMainWindow):
         w_hBoxLayout.addWidget(w_pProgressBar)
 
 
-        # ! [hbox] Render Progress
+        # [hbox] Render Progress
         w_hBoxLayout = qtw.QHBoxLayout()
         w_vBoxLayout.addLayout(w_hBoxLayout)
 
@@ -680,10 +686,10 @@ class MainWindow(qtw.QMainWindow):
                 return
             open_folder(preset.renders_list[-1])
 
-        self.w_openRenderFolder = w_openRenderFolder = qtw.QPushButton("Open Folder", clicked=lambda: open_render_folder())
-        # w_openRenderFolder.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
+        self.w_openRenderFolder = w_openRenderFolder = qtw.QPushButton("", clicked=lambda: open_render_folder())
+        w_openRenderFolder.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
         w_openRenderFolder.setToolTip("Open last saved render folder.")
-        w_openRenderFolder.setFixedWidth(80)
+        w_openRenderFolder.setFixedWidth(40)
         w_openRenderFolder.setFixedHeight(40)
         w_hBoxLayout.addWidget(w_openRenderFolder)
 
@@ -834,6 +840,7 @@ class MainWindow(qtw.QMainWindow):
             w_project.set_samples(project.get_samples())
             # w_project.set_camera(project.camera)
             w_project.set_render_filepath(project.get_render_filepath())
+            w_project.update_buttons()
 
             item = qtw.QListWidgetItem(self.w_listOfProjects)
             item.setSizeHint(w_project.sizeHint())
@@ -896,7 +903,7 @@ class MainWindow(qtw.QMainWindow):
             self.w_preview_render.setEnabled(True)
             self.w_marker_render.setEnabled(True)
 
-        self.w_openFolder.setEnabled(bool(preset.blender_exe))
+        # self.w_openFolder.setEnabled(bool(preset.blender_exe))
 
         self.w_startRender.setEnabled(bool(preset.blender_exe and not preset.is_status('RENDERING') and preset.project_list and preset.get_global_frames_number()))
         self.w_stopRender.setEnabled(preset.is_status('RENDERING') and not preset.is_status('RENDERING_STOPPING'))
