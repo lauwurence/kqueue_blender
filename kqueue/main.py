@@ -453,7 +453,6 @@ class MainWindow(qtw.QMainWindow):
             w_locateSave.setIcon(qtg.QIcon('kqueue/icons/save.svg'))
             w_locateSave.setToolTip("Save the current file in the desired location.")
             w_locateSave.setShortcut(qtg.QKeySequence("Ctrl+Shift+S"))
-            # w_locateSave.setFixedWidth(100)
             w_hBoxLayout.addWidget(w_locateSave)
 
             # [shortcut] Save
@@ -464,7 +463,6 @@ class MainWindow(qtw.QMainWindow):
             w_locateLoad.clicked.connect(lambda: self.update_widgets.emit())
             w_locateLoad.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
             w_locateLoad.setToolTip("Open a kQueue file.")
-            # w_locateLoad.setFixedWidth(100)
             w_hBoxLayout.addWidget(w_locateLoad)
 
             # [edit] Path to Blender
@@ -477,26 +475,131 @@ class MainWindow(qtw.QMainWindow):
             w_locateBlender.clicked.connect(lambda: self.update_widgets.emit())
             w_locateBlender.setIcon(qtg.QIcon('kqueue/icons/blender.svg'))
             w_locateBlender.setToolTip("Locate a Blender executable.")
-            # w_locateBlender.setFixedWidth(100)
             w_hBoxLayout.addWidget(w_locateBlender)
 
-            # # [button] Locate Blender
-            # self.w_openFolder = w_openFolder = qtw.QPushButton("Open Folder", clicked=lambda: open_folder(preset.blender_exe))
-            # w_openFolder.setFixedWidth(100)
-            # w_openFolder.setEnabled(False)
-            # w_hBoxLayout.addWidget(w_openFolder)
-
         # [list] List of Projects
-        def open_project_settings(self):
-            project = self.get_selected_project()
-            self.sw = QBlendProjectSettings(project)
+        def open_project_settings():
+            self.sw = QBlendProjectSettings(self.get_selected_project())
             self.sw.show()
 
         self.w_listOfProjects = w_listOfProjects = QListWidget()
-        w_listOfProjects.itemDoubleClicked.connect(lambda: open_project_settings(self))
+        w_listOfProjects.itemDoubleClicked.connect(open_project_settings)
         w_listOfProjects.setDragDropMode(qtw.QAbstractItemView.InternalMove)
         w_listOfProjects.model().rowsMoved.connect(lambda: self.update_list.emit(True))
         w_vBoxLayout.addWidget(w_listOfProjects)
+
+        # [hbox]
+        w_hBoxLayout = qtw.QHBoxLayout()
+        w_vBoxLayout.addLayout(w_hBoxLayout)
+
+        # [check] Global active
+        self.w_global_active = qtw.QCheckBox("All")
+        w_hBoxLayout.addWidget(self.w_global_active)
+
+        def toggle_global_active():
+            active = self.w_global_active.isChecked()
+            changed = False
+
+            for project in preset.project_list:
+
+                if active == project.active:
+                    continue
+
+                project.active = active
+                changed = True
+
+            if not changed:
+                return
+
+            store.mw.update_list.emit(False)
+            store.mw.update_widgets.emit()
+            store.preset.set_need_save()
+
+        self.w_global_active.clicked.connect(toggle_global_active)
+        self.w_global_active.setStyleSheet("""
+            QCheckBox::indicator {
+                width : 12;
+                height : 12;
+            }
+        """)
+
+        l_form = qtw.QFormLayout()
+        w_hBoxLayout.addLayout(l_form)
+
+
+        # [button] Sample
+        def toggle_global_active(samples):
+            changed = False
+
+            for project in preset.project_list:
+
+                if samples == project.samples_override:
+                    continue
+
+                project.samples_override = samples
+                changed = True
+
+            if not changed:
+                return
+
+            store.mw.update_list.emit(False)
+            store.mw.update_widgets.emit()
+            store.preset.set_need_save()
+
+        # [button] 32
+        w_setGlobalSamples = qtw.QPushButton('32', clicked=lambda: toggle_global_active(32))
+        w_setGlobalSamples.setFixedWidth(32)
+        w_hBoxLayout.addWidget(w_setGlobalSamples)
+
+        # [button] 64
+        w_setGlobalSamples = qtw.QPushButton('64', clicked=lambda: toggle_global_active(64))
+        w_setGlobalSamples.setFixedWidth(32)
+        w_hBoxLayout.addWidget(w_setGlobalSamples)
+
+        # [button] 128
+        w_setGlobalSamples = qtw.QPushButton('128', clicked=lambda: toggle_global_active(128))
+        w_setGlobalSamples.setFixedWidth(32)
+        w_hBoxLayout.addWidget(w_setGlobalSamples)
+
+        # [button] 256
+        w_setGlobalSamples = qtw.QPushButton('256', clicked=lambda: toggle_global_active(256))
+        w_setGlobalSamples.setFixedWidth(32)
+        w_hBoxLayout.addWidget(w_setGlobalSamples)
+
+        # [button] 512
+        w_setGlobalSamples = qtw.QPushButton('512', clicked=lambda: toggle_global_active(512))
+        w_setGlobalSamples.setFixedWidth(32)
+        w_hBoxLayout.addWidget(w_setGlobalSamples)
+
+        # [button] 1024
+        w_setGlobalSamples = qtw.QPushButton('1024', clicked=lambda: toggle_global_active(1024))
+        w_setGlobalSamples.setFixedWidth(32)
+        w_hBoxLayout.addWidget(w_setGlobalSamples)
+
+        # [button] 2048
+        w_setGlobalSamples = qtw.QPushButton('2048', clicked=lambda: toggle_global_active(2048))
+        w_setGlobalSamples.setFixedWidth(32)
+        w_hBoxLayout.addWidget(w_setGlobalSamples)
+
+        # [button] 4096
+        w_setGlobalSamples = qtw.QPushButton('4096', clicked=lambda: toggle_global_active(4096))
+        w_setGlobalSamples.setFixedWidth(32)
+        w_hBoxLayout.addWidget(w_setGlobalSamples)
+
+        # [button] Reload
+        def global_reload():
+
+            for project in preset.project_list:
+
+                if not project.is_outdated():
+                    continue
+
+                project.reload()
+
+        w_global_reload = qtw.QPushButton("", clicked=global_reload)
+        w_global_reload.setIcon(qtg.QIcon('kqueue/icons/reload_project.svg'))
+        w_global_reload.setFixedWidth(24)
+        w_hBoxLayout.addWidget(w_global_reload)
 
         # # [label] Global Settings
         # w_globalSettings = qtw.QLabel("Global Settings:")
@@ -772,7 +875,7 @@ class MainWindow(qtw.QMainWindow):
 
         else:
             result = qtw.QMessageBox.question(self,
-                        "Confirm Exit...",
+                        "Confirm Exit",
                         "Are you sure you want to exit?",
                         qtw.QMessageBox.Yes| qtw.QMessageBox.No)
             event.ignore()
@@ -830,6 +933,7 @@ class MainWindow(qtw.QMainWindow):
 
         # Add items to the list widget
         self.w_listOfProjects.clear()
+        global_active = True
 
         for project in preset.project_list:
             w_project = QBlendProject(project=project)
@@ -847,6 +951,12 @@ class MainWindow(qtw.QMainWindow):
 
             self.w_listOfProjects.addItem(item)
             self.w_listOfProjects.setItemWidget(item, w_project)
+
+            if not project.active:
+                global_active = False
+
+        # Set global active
+        self.w_global_active.setChecked(global_active)
 
         # Calculate frames
         project_frames = None
