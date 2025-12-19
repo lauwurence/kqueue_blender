@@ -100,6 +100,13 @@ class BlendProject():
         return self.get(self.frames_override, self.frames) or ""
 
 
+    def frames_overriden(self):
+        """
+        """
+
+        return self.get_frames() != self.frames
+
+
     def get_markers(self):
         """
         Get markers as a string.

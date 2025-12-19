@@ -120,6 +120,9 @@ class QBlendProject(qtw.QWidget):
     def set_frames(self, frames):
         self.w_frames.setText(f'| Frames: [{frames}]')
 
+        if self.project.frames_overriden():
+            self.w_frames.setStyleSheet("font-weight: bold;")
+
     def set_samples(self, samples):
         self.w_samples.setText(f'| Samples: {samples}')
 
@@ -329,7 +332,7 @@ class QBlendProjectSettings(qtw.QWidget):
             if getattr(self.project, variable) == value:
                 return
 
-            setattr(self.project, variable, value)
+            setattr(self.project, variable, value or None)
             store.preset.set_need_save()
 
         set_value('frames_override', self.w_frames.text())

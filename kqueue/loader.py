@@ -127,6 +127,10 @@ blender "{file}" --factory-startup --background  --python "{store.get_data_py.re
                 preset.project_list.append(loaded_project)
 
             else:
+
+                if project.frames != loaded_project.frames:
+                    project.frames_override = loaded_project.frames_override
+
                 for name in [
                     'frames',
                     'scene',
