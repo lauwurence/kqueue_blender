@@ -51,23 +51,36 @@ class RenderThread(qtc.QThread):
 
             PYTOH_FILE = join(store.working_dir, "blender/temp/render_settings.py")
 
-            if preset.preview_render:
-                PYTHON = f"""
+            PYTHON = f"""
 import bpy
 
 scene = bpy.context.scene
+cycles = scene.cycles
 render = scene.render
 shading = scene.display.shading
 
-# Output
-scene.camera = bpy.data.objects["{ca}"]
+# Scene
+if "{ca}" in bpy.data.objects:
+    scene.camera = bpy.data.objects["{ca}"]
+
 render.filepath = "{project.get_render_filepath().replace('\\', '/')}"
 render.use_overwrite = True
+render.use_persistent_data = {project.get_use_persistent_data()}
+
+# Compositor
+render.compositor_device = "GPU"
+render.compositor_precision = "FULL"
+"""
+
+            if preset.preview_render:
+                PYTHON += f"""
+
+# Render
 render.use_simplify = True
 render.simplify_subdivision_render = 0
 render.use_border = False
 
-# Render
+# Shading
 shading.color_type = "TEXTURE"
 shading.show_cavity = True
 shading.use_dof = True
@@ -81,18 +94,7 @@ render.compositor_precision = "FULL"
 """
 
             else:
-                PYTHON = f"""
-import bpy
-
-scene = bpy.context.scene
-cycles = scene.cycles
-render = scene.render
-
-# Output
-scene.camera = bpy.data.objects["{ca}"]
-render.use_persistent_data = {project.get_use_persistent_data()}
-render.filepath = "{project.get_render_filepath().replace('\\', '/')}"
-render.use_overwrite = True
+                PYTHON += f"""
 render.use_simplify = False
 render.use_border = False
 
@@ -106,10 +108,6 @@ cycles.denoising_input_passes = "{project.get_denoising_input_passes()}"
 cycles.denoising_prefilter = "{project.get_denoising_prefilter()}"
 cycles.denoising_quality = "HIGH"
 cycles.denoising_use_gpu = {project.get_denoising_use_gpu()}
-
-# Compositor
-render.compositor_device = "GPU"
-render.compositor_precision = "FULL"
 """
 
             # Technically, take scene settings and assigning sRGB

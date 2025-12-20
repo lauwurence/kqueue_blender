@@ -1107,8 +1107,8 @@ QListView::item:selected {
 ############################################################################
 
 if DEV_MODE:
-    preset.load_from("F:/RenPy/00_Renders/kqueue_blender/kqueue/saves/test.kqp")
-    preset.set_blender("H:/Blender Foundation/blender-5.0.0/blender.exe")
+    preset.load_from("F:/RenPy/00_Renders/kqueue_blender/kqueue/saves/06_Night.kqp")
+    # preset.set_blender("H:/Blender Foundation/blender-5.0.0/blender.exe")
     # preset.add_projects("I:/Blender Library/00_Parts/00_Intro/03_HomeRoaming (old)/001.blend")
     #                     "I:/Blender Library/00_Parts/00_Intro/00_Inside/002_GuitarTuning.blend")
     # mw.update_widgets.emit()
