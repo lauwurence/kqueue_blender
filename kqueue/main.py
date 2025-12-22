@@ -212,14 +212,18 @@ class QueuePreset():
         """
         """
 
-        if not self.filename:
+        filename = self.filename
+
+        if not filename:
             return
 
         from .save_load import save_file
-        save_file([self.project_list, self.blender_exe], self.filename, version=1)
+        save_file([self.project_list, self.blender_exe], filename, version=1)
 
-        self.set_save(self.filename)
+        self.set_save(filename)
         self.set_need_save(False)
+
+        log(f'Saved: {filename}')
 
 
     def save_as(self):
@@ -243,6 +247,8 @@ class QueuePreset():
 
         self.set_save(filename)
         self.set_need_save(False)
+
+        log(f'Saved: {filename}')
 
 
     def load_from(self, filename=None):
@@ -279,6 +285,8 @@ class QueuePreset():
         mw.update_list.emit(False)
         mw.update_widgets.emit()
 
+        log(f'Loaded: {filename}')
+
 
     def set_save(self, filename):
         """
@@ -289,8 +297,6 @@ class QueuePreset():
             return
 
         self.filename = filename
-        log(f'Loaded file: {filename}')
-
         mw.update_title.emit()
 
 
