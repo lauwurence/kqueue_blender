@@ -1175,6 +1175,11 @@ QLabel {
     color: #e0e0e0;
 }
 
+QLabel:disabled {
+    font-size: 10px;
+    color: #707070;
+}
+
 QPushButton {
     font-size: 11px;
     background-color: #3a3a3a;
@@ -1411,6 +1416,16 @@ QCheckBox::indicator:checked {
     background-color: #448fff;
     border: 1px solid #448fff;
     border-radius: 3px;
+}
+
+QCheckBox::indicator:unchecked:disabled {
+    background-color: #212121;
+    border: 1px solid #2e2d2d;
+}
+
+QCheckBox::indicator:checked:disabled {
+    background-color: #224880;
+    border: 1px solid #224880;
 }
 
 QGroupBox {
