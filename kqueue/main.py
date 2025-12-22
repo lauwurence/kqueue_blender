@@ -1286,17 +1286,17 @@ QListWidget::item:selected:active {
 
 QScrollBar:vertical {
     background-color: transparent;
-    width: 12px;
+    width: 14px;
     border: none;
     margin: 0px;
-    padding: 0px;
+    padding: 2px;
 }
 
 QScrollBar::handle:vertical {
     background-color: rgba(85, 85, 85, 120);
-    border-radius: 6px;
+    border-radius: 5px;
     min-height: 20px;
-    margin: 2px 0px;
+    margin: 0px 0px;
 }
 
 QScrollBar::handle:vertical:hover {
@@ -1324,18 +1324,17 @@ QScrollBar::sub-page:vertical {
 
 QScrollBar:horizontal {
     background-color: transparent;
-    height: 12px;
+    height: 14px;
     border: none;
     margin: 0px;
-    padding: 0px;
-    border-radius: 6px;
+    padding: 2px;
 }
 
 QScrollBar::handle:horizontal {
     background-color: rgba(85, 85, 85, 120);
-    border-radius: 6px;
+    border-radius: 5px;
     min-width: 20px;
-    margin: 0px 2px;
+    margin: 0px 0px;
 }
 
 QScrollBar::handle:horizontal:hover {
