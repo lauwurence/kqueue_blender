@@ -1,7 +1,7 @@
 # kQueue Blender
 Queue Blender projects and override settings.
 
-![image](https://github.com/user-attachments/assets/846f88b2-884a-4fcc-bf8f-5055c2b66b17)
+<img width="2798" height="1319" alt="image" src="https://github.com/user-attachments/assets/d5e6f62f-bf00-40a5-9c71-e44e0cd0d8eb" />
 
 ## What can it do:
 1. Save and load kQueue files.
