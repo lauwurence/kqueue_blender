@@ -882,7 +882,7 @@ class MainWindow(qtw.QMainWindow):
         w_hBoxLayout.addWidget(w_openRenderFolder)
 
         # [button] Screens Off
-        w_screensOff = QPushButton("", clicked=lambda: monitor.screen_off())
+        w_screensOff = QPushButton("", clicked=lambda: monitor.screen_off(delay=1.0))
         w_screensOff.setIcon(qtg.QIcon('kqueue/icons/screen_off.svg'))
         w_screensOff.setToolTip("Turn off the screens.")
         w_screensOff.setFixedWidth(40)
