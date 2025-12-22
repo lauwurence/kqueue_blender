@@ -1,11 +1,13 @@
 ################################################################################
 ## Main
 
+import ctypes
 import subprocess
 
 import PyQt5.QtWidgets as qtw
 import PyQt5.QtGui as qtg
 import PyQt5.QtCore as qtc
+import PyQt5.QtSvg as qts
 from PyQt5.QtCore import Qt
 
 from os import getcwd, makedirs
@@ -14,7 +16,6 @@ from time import time, sleep
 from pathlib import Path
 from psutil import Process
 from threading import Thread
-from ctypes import windll
 
 from .utils import monitor
 from .utils.path import join, open_folder, open_image
@@ -24,6 +25,8 @@ from .render import RenderThread
 from .loader import LoaderThread
 from .config import *
 from . import store
+
+from .widgets.QPushButton import QPushButton
 
 if hasattr(Qt, 'AA_EnableHighDpiScaling'):
     qtw.QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
@@ -274,6 +277,7 @@ class QueuePreset():
         self.set_need_save(False)
 
         mw.update_list.emit(False)
+        mw.update_widgets.emit()
 
 
     def set_save(self, filename):
@@ -304,6 +308,52 @@ class QueuePreset():
 
         self.loader_thread = LoaderThread(*files)
         self.loader_thread.start()
+
+
+    def reload_projects(self):
+        """
+        Reload outdated projects.
+        """
+
+        files = []
+
+        for project in self.project_list:
+
+            if not project.is_outdated():
+                continue
+
+            files.append(project.file)
+
+        self.add_projects(*files)
+
+
+    def get_outdated_projects(self):
+        """
+        """
+
+        rv = []
+
+        for project in self.project_list:
+
+            if not project.is_outdated():
+                continue
+
+            rv.append(project)
+
+        return rv
+
+
+    def has_outdated_projects(self):
+        """ """
+
+        return bool(self.get_outdated_projects())
+
+
+    def periodic(self):
+        """
+        """
+
+        mw.update_widgets.emit()
 
 
     def start_render(self):
@@ -396,6 +446,24 @@ class QueuePreset():
 ################################################################################
 ## Main Window
 
+class QSvgWidget(qts.QSvgWidget):
+    """
+    Custom widget to track current file.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.current_filename = None
+
+    def setImage(self, filename):
+
+        if filename == self.current_filename:
+            return
+
+        self.current_filename = filename
+        self.load(filename)
+
+
 class QListWidget(qtw.QListWidget):
     """
     Custom List Widget that fixed disappearing items.
@@ -413,18 +481,47 @@ class QListWidget(qtw.QListWidget):
             super().dragMoveEvent(event)
 
 
+def set_window_titlebar_dark(window):
+    """
+    Set dark Windows title bar.
+    """
+
+    try:
+        hwnd = window.winId().__int__()
+        DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+        DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19
+
+        value = ctypes.c_int(2)
+        result = ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_IMMERSIVE_DARK_MODE,
+            ctypes.byref(value),
+            ctypes.sizeof(value)
+        )
+
+        if result != 0:
+            value = ctypes.c_int(1)
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
+                ctypes.byref(value),
+                ctypes.sizeof(value)
+            )
+
+    except Exception as e:
+        pass
+
+
 class MainWindow(qtw.QMainWindow):
     update_title = qtc.pyqtSignal()
     update_list = qtc.pyqtSignal(bool)
     update_widgets = qtc.pyqtSignal()
     log = qtc.pyqtSignal(str)
 
-    def test(self):
-        print(1)
-
-
     def __init__(self):
         super().__init__()
+
+        set_window_titlebar_dark(self)
 
         self.setWindowIcon(qtg.QIcon(ICON))
 
@@ -448,9 +545,10 @@ class MainWindow(qtw.QMainWindow):
             w_vBoxLayout.addLayout(w_hBoxLayout)
 
             # [button] Locate Save
-            self.w_locateSave = w_locateSave = qtw.QPushButton("", clicked=lambda: preset.save_as())
+            self.w_locateSave = w_locateSave = QPushButton("", clicked=lambda: preset.save_as())
             w_locateSave.clicked.connect(lambda: self.update_widgets.emit())
             w_locateSave.setIcon(qtg.QIcon('kqueue/icons/save.svg'))
+            w_locateSave.setFixedHeight(26)
             w_locateSave.setToolTip("Save the current file in the desired location.")
             w_locateSave.setShortcut(qtg.QKeySequence("Ctrl+Shift+S"))
             w_hBoxLayout.addWidget(w_locateSave)
@@ -459,22 +557,26 @@ class MainWindow(qtw.QMainWindow):
             qtw.QShortcut('Ctrl+S', self).activated.connect(lambda: preset.save())
 
             # [button] Load
-            self.w_locateLoad = w_locateLoad = qtw.QPushButton("", clicked=lambda: preset.load_from())
+            self.w_locateLoad = w_locateLoad = QPushButton("", clicked=lambda: preset.load_from())
             w_locateLoad.clicked.connect(lambda: self.update_widgets.emit())
             w_locateLoad.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
+            w_locateLoad.setFixedHeight(26)
             w_locateLoad.setToolTip("Open a kQueue file.")
             w_hBoxLayout.addWidget(w_locateLoad)
 
             # [edit] Path to Blender
             self.w_pathToBlender = w_pathToBlender = qtw.QLineEdit("Locate blender.exe first!")
             w_pathToBlender.setEnabled(False)
+            w_pathToBlender.setFixedHeight(26)
             w_hBoxLayout.addWidget(w_pathToBlender)
 
             # [button] Locate Blender
-            self.w_locateBlender = w_locateBlender = qtw.QPushButton("", clicked=lambda: preset.locate_blender())
+            self.w_locateBlender = w_locateBlender = QPushButton("", clicked=lambda: preset.locate_blender())
             w_locateBlender.clicked.connect(lambda: self.update_widgets.emit())
             w_locateBlender.setIcon(qtg.QIcon('kqueue/icons/blender.svg'))
+            w_locateBlender.setIconSize(qtc.QSize(18, 18))
             w_locateBlender.setToolTip("Locate a Blender executable.")
+            w_locateBlender.setFixedHeight(26)
             w_hBoxLayout.addWidget(w_locateBlender)
 
         # [list] List of Projects
@@ -518,88 +620,54 @@ class MainWindow(qtw.QMainWindow):
         self.w_global_active.clicked.connect(toggle_global_active)
         self.w_global_active.setStyleSheet("""
             QCheckBox::indicator {
-                width : 12;
-                height : 12;
+                width: 12;
+                height: 12;
             }
         """)
 
         l_form = qtw.QFormLayout()
         w_hBoxLayout.addLayout(l_form)
 
-
-        # [button] Sample
+        # [button] Set Sample Globally
         def toggle_global_active(samples):
-            changed = False
 
-            for project in preset.project_list:
+            def func():
+                changed = False
 
-                if samples == project.samples_override:
-                    continue
+                for project in store.preset.project_list:
 
-                project.samples_override = samples
-                changed = True
+                    if samples == project.samples_override:
+                        continue
 
-            if not changed:
+                    project.samples_override = samples
+                    changed = True
+
+                if not changed:
+                    return
+
+                store.mw.update_list.emit(False)
+                store.mw.update_widgets.emit()
+                store.preset.set_need_save()
+
                 return
 
-            store.mw.update_list.emit(False)
-            store.mw.update_widgets.emit()
-            store.preset.set_need_save()
+            return func
 
-        # [button] 32
-        w_setGlobalSamples = qtw.QPushButton('32', clicked=lambda: toggle_global_active(32))
-        w_setGlobalSamples.setFixedWidth(32)
-        w_hBoxLayout.addWidget(w_setGlobalSamples)
+        self.w_setGlobalSamples_list = []
 
-        # [button] 64
-        w_setGlobalSamples = qtw.QPushButton('64', clicked=lambda: toggle_global_active(64))
-        w_setGlobalSamples.setFixedWidth(32)
-        w_hBoxLayout.addWidget(w_setGlobalSamples)
+        for sample in [ 32, 64, 128, 256, 512, 1024, 2048, 4096 ]:
+            w_setGlobalSamples = QPushButton(f'{sample}', clicked=toggle_global_active(sample))
+            w_setGlobalSamples.setFixedWidth(48)
+            w_hBoxLayout.addWidget(w_setGlobalSamples)
 
-        # [button] 128
-        w_setGlobalSamples = qtw.QPushButton('128', clicked=lambda: toggle_global_active(128))
-        w_setGlobalSamples.setFixedWidth(32)
-        w_hBoxLayout.addWidget(w_setGlobalSamples)
-
-        # [button] 256
-        w_setGlobalSamples = qtw.QPushButton('256', clicked=lambda: toggle_global_active(256))
-        w_setGlobalSamples.setFixedWidth(32)
-        w_hBoxLayout.addWidget(w_setGlobalSamples)
-
-        # [button] 512
-        w_setGlobalSamples = qtw.QPushButton('512', clicked=lambda: toggle_global_active(512))
-        w_setGlobalSamples.setFixedWidth(32)
-        w_hBoxLayout.addWidget(w_setGlobalSamples)
-
-        # [button] 1024
-        w_setGlobalSamples = qtw.QPushButton('1024', clicked=lambda: toggle_global_active(1024))
-        w_setGlobalSamples.setFixedWidth(32)
-        w_hBoxLayout.addWidget(w_setGlobalSamples)
-
-        # [button] 2048
-        w_setGlobalSamples = qtw.QPushButton('2048', clicked=lambda: toggle_global_active(2048))
-        w_setGlobalSamples.setFixedWidth(32)
-        w_hBoxLayout.addWidget(w_setGlobalSamples)
-
-        # [button] 4096
-        w_setGlobalSamples = qtw.QPushButton('4096', clicked=lambda: toggle_global_active(4096))
-        w_setGlobalSamples.setFixedWidth(32)
-        w_hBoxLayout.addWidget(w_setGlobalSamples)
+            self.w_setGlobalSamples_list.append(w_setGlobalSamples)
 
         # [button] Reload
-        def global_reload():
-
-            for project in preset.project_list:
-
-                if not project.is_outdated():
-                    continue
-
-                project.reload()
-
-        w_global_reload = qtw.QPushButton("", clicked=global_reload)
-        w_global_reload.setIcon(qtg.QIcon('kqueue/icons/reload_project.svg'))
-        w_global_reload.setFixedWidth(24)
-        w_hBoxLayout.addWidget(w_global_reload)
+        self.w_global_reload = QPushButton("", clicked=lambda: preset.reload_projects())
+        self.w_global_reload.setIcon(qtg.QIcon('kqueue/icons/reload_project.svg'))
+        self.w_global_reload.setToolTip("Reload all the projects.")
+        self.w_global_reload.setFixedWidth(24)
+        w_hBoxLayout.addWidget(self.w_global_reload)
 
         # # [label] Global Settings
         # w_globalSettings = qtw.QLabel("Global Settings:")
@@ -613,64 +681,74 @@ class MainWindow(qtw.QMainWindow):
         # w_presetSamples = qtw.QLineEdit()
         # l_presetOverride.addRow("Samples", w_presetSamples)
 
-        # [label] Output
-        self.w_logOutput = qtw.QLabel("...")
-        self.w_logOutput.setFixedHeight(40)
-        self.w_logOutput.setEnabled(False)
-        w_vBoxLayout.addWidget(self.w_logOutput)
+        # [hbox]
+        w_hBoxLayout = qtw.QHBoxLayout()
+        w_vBoxLayout.addLayout(w_hBoxLayout)
+
+        if True:
+
+            # [label] Status
+            self.w_logStatus = QSvgWidget("kqueue/icons/status_loading.svg")
+            self.w_logStatus.setFixedSize(16, 16)
+            w_hBoxLayout.addWidget(self.w_logStatus)
+
+            # [label] Output
+            self.w_logOutput = qtw.QLabel("...")
+            self.w_logOutput.setFixedHeight(40)
+            self.w_logOutput.setEnabled(False)
+            w_hBoxLayout.addWidget(self.w_logOutput)
 
 
         # [hbox]
         w_hBoxLayout = qtw.QHBoxLayout()
         w_vBoxLayout.addLayout(w_hBoxLayout)
 
-        # [label] Global Progress
-        self.w_gProgress = w_gProgress = qtw.QLabel("Global:")
-        w_hBoxLayout.addWidget(w_gProgress)
+        if True:
 
-        # [bar] Global Progress Bar
-        self.w_gProgressBar = w_gProgressBar = qtw.QProgressBar(self)
-        w_gProgressBar.setRange(0, 100)
-        w_gProgressBar.setValue(0)
-        w_gProgressBar.setFixedHeight(20)
-        # w_gProgressBar.setTextVisible(False)
-        w_hBoxLayout.addWidget(w_gProgressBar)
+            # [label] Global Progress
+            self.w_gProgress = w_gProgress = qtw.QLabel("Global:")
+            w_hBoxLayout.addWidget(w_gProgress)
+
+            # [bar] Global Progress Bar
+            self.w_gProgressBar = w_gProgressBar = qtw.QProgressBar(self)
+            w_gProgressBar.setRange(0, 100)
+            w_gProgressBar.setValue(0)
+            w_gProgressBar.setFixedHeight(20)
+            # w_gProgressBar.setTextVisible(False)
+            w_hBoxLayout.addWidget(w_gProgressBar)
+
+            # [hbox] Project Progress
+            w_hBoxLayout = qtw.QHBoxLayout()
+            w_vBoxLayout.addLayout(w_hBoxLayout)
+
+            # [label] Project Progress
+            self.w_pProgress = w_pProgress = qtw.QLabel("Project:")
+            w_hBoxLayout.addWidget(w_pProgress)
+
+            # [bar] Project Progress Bar
+            self.w_pProgressBar = w_pProgressBar = qtw.QProgressBar(self)
+            w_pProgressBar.setRange(0, 100)
+            w_pProgressBar.setValue(0)
+            w_pProgressBar.setFixedHeight(10)
+            w_pProgressBar.setTextVisible(False)
+            w_hBoxLayout.addWidget(w_pProgressBar)
 
 
-        # [hbox] Project Progress
-        w_hBoxLayout = qtw.QHBoxLayout()
-        w_vBoxLayout.addLayout(w_hBoxLayout)
+            # [hbox] Render Progress
+            w_hBoxLayout = qtw.QHBoxLayout()
+            w_vBoxLayout.addLayout(w_hBoxLayout)
 
-        # [label] Project Progress
-        self.w_pProgress = w_pProgress = qtw.QLabel("Project:")
-        w_hBoxLayout.addWidget(w_pProgress)
+            # [bar] Render Progress Bar
+            self.w_rProgressBar = w_rProgressBar = qtw.QProgressBar(self)
+            w_rProgressBar.setRange(0, 100)
+            w_rProgressBar.setValue(0)
+            w_rProgressBar.setFixedHeight(4)
+            w_rProgressBar.setTextVisible(False)
+            w_hBoxLayout.addWidget(w_rProgressBar)
 
-        # [bar] Project Progress Bar
-        self.w_pProgressBar = w_pProgressBar = qtw.QProgressBar(self)
-        w_pProgressBar.setRange(0, 100)
-        w_pProgressBar.setValue(0)
-        w_pProgressBar.setFixedHeight(10)
-        w_pProgressBar.setTextVisible(False)
-        w_hBoxLayout.addWidget(w_pProgressBar)
-
-
-        # [hbox] Render Progress
-        w_hBoxLayout = qtw.QHBoxLayout()
-        w_vBoxLayout.addLayout(w_hBoxLayout)
-
-        # [bar] Render Progress Bar
-        self.w_rProgressBar = w_rProgressBar = qtw.QProgressBar(self)
-        w_rProgressBar.setRange(0, 100)
-        w_rProgressBar.setValue(0)
-        w_rProgressBar.setFixedHeight(4)
-        w_rProgressBar.setTextVisible(False)
-        w_hBoxLayout.addWidget(w_rProgressBar)
-
-        # [label] Global Progress
-        self.w_gProgressETA = w_gProgressETA = qtw.QLabel()
-        w_vBoxLayout.addWidget(w_gProgressETA)
-
-        # w_vBoxLayout.addSpacing(10)
+            # [label] Global Progress
+            self.w_gProgressETA = w_gProgressETA = qtw.QLabel()
+            w_vBoxLayout.addWidget(w_gProgressETA)
 
 
         # [check] Preview Render
@@ -737,12 +815,12 @@ class MainWindow(qtw.QMainWindow):
         w_hBoxLayoutOnComplete.addWidget(w_onComplete)
 
         # # [button] Shutdown
-        # w_shutdown = qtw.QPushButton("Shutdown", clicked=lambda: preset.shutdown())
+        # w_shutdown = QPushButton("Shutdown", clicked=lambda: preset.shutdown())
         # w_hBoxLayoutOnComplete.addWidget(w_shutdown)
 
         # [button] Cancel Shutdown
-        self.w_cancelShutdown = w_cancelShutdown = qtw.QPushButton("Cancel", clicked=lambda: preset.cancel_shutdown())
-        w_cancelShutdown.setFixedHeight(30)
+        self.w_cancelShutdown = w_cancelShutdown = QPushButton("Cancel", clicked=lambda: preset.cancel_shutdown())
+        w_cancelShutdown.setFixedHeight(25)
         w_cancelShutdown.setEnabled(False)
         w_hBoxLayoutOnComplete.addWidget(w_cancelShutdown, 2, Qt.AlignLeft)
 
@@ -751,7 +829,7 @@ class MainWindow(qtw.QMainWindow):
         w_hBoxLayout.addLayout(w_hBoxLayoutRender)
 
         # [button] Start Render
-        self.w_startRender = w_startRender = qtw.QPushButton("", clicked=lambda: preset.start_render())
+        self.w_startRender = w_startRender = QPushButton("", clicked=lambda: preset.start_render())
         w_startRender.setIcon(qtg.QIcon('kqueue/icons/play.svg'))
         w_startRender.setToolTip("Start rendering.")
         w_startRender.setFixedWidth(100)
@@ -760,7 +838,7 @@ class MainWindow(qtw.QMainWindow):
         w_hBoxLayoutRender.addWidget(w_startRender)
 
         # [button] Stop Render
-        self.w_stopRender = w_stopRender = qtw.QPushButton("", clicked=lambda: preset.stop_render())
+        self.w_stopRender = w_stopRender = QPushButton("", clicked=lambda: preset.stop_render())
         w_stopRender.setIcon(qtg.QIcon('kqueue/icons/stop.svg'))
         w_stopRender.setToolTip("Stop rendering.")
         w_stopRender.setFixedWidth(100)
@@ -776,7 +854,7 @@ class MainWindow(qtw.QMainWindow):
                 return
             open_image(preset.renders_list[-1])
 
-        self.w_openRender = w_openRender = qtw.QPushButton("", clicked=lambda: open_render())
+        self.w_openRender = w_openRender = QPushButton("", clicked=lambda: open_render())
         w_openRender.setIcon(qtg.QIcon('kqueue/icons/open_render.svg'))
         w_openRender.setToolTip("Open last saved render.")
         w_openRender.setFixedWidth(40)
@@ -789,7 +867,7 @@ class MainWindow(qtw.QMainWindow):
                 return
             open_folder(preset.renders_list[-1])
 
-        self.w_openRenderFolder = w_openRenderFolder = qtw.QPushButton("", clicked=lambda: open_render_folder())
+        self.w_openRenderFolder = w_openRenderFolder = QPushButton("", clicked=lambda: open_render_folder())
         w_openRenderFolder.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
         w_openRenderFolder.setToolTip("Open last saved render folder.")
         w_openRenderFolder.setFixedWidth(40)
@@ -797,7 +875,7 @@ class MainWindow(qtw.QMainWindow):
         w_hBoxLayout.addWidget(w_openRenderFolder)
 
         # [button] Screens Off
-        w_screensOff = qtw.QPushButton("", clicked=lambda: monitor.screen_off())
+        w_screensOff = QPushButton("", clicked=lambda: monitor.screen_off())
         w_screensOff.setIcon(qtg.QIcon('kqueue/icons/screen_off.svg'))
         w_screensOff.setToolTip("Turn off the screens.")
         w_screensOff.setFixedWidth(40)
@@ -944,7 +1022,7 @@ class MainWindow(qtw.QMainWindow):
             w_project.set_samples(project.get_samples())
             # w_project.set_camera(project.camera)
             w_project.set_render_filepath(project.get_render_filepath())
-            w_project.update_buttons()
+            w_project.update_widgets()
 
             item = qtw.QListWidgetItem(self.w_listOfProjects)
             item.setSizeHint(w_project.sizeHint())
@@ -1003,6 +1081,12 @@ class MainWindow(qtw.QMainWindow):
             # self.w_assign_srgb.setEnabled(False)
             self.w_preview_render.setEnabled(False)
             self.w_marker_render.setEnabled(False)
+            self.w_global_reload.setEnabled(False)
+
+            self.w_logStatus.setImage("kqueue/icons/status_loading.svg")
+
+            for widget in self.w_setGlobalSamples_list:
+                widget.setEnabled(False)
 
         else:
             self.w_locateSave.setEnabled(True)
@@ -1012,8 +1096,15 @@ class MainWindow(qtw.QMainWindow):
             # self.w_assign_srgb.setEnabled(True)
             self.w_preview_render.setEnabled(True)
             self.w_marker_render.setEnabled(True)
+            self.w_global_reload.setEnabled(preset.has_outdated_projects())
 
-        # self.w_openFolder.setEnabled(bool(preset.blender_exe))
+            if preset.is_adding_projects:
+                self.w_logStatus.setImage("kqueue/icons/status_loading.svg")
+            else:
+                self.w_logStatus.setImage("kqueue/icons/status_idle.svg")
+
+            for widget in self.w_setGlobalSamples_list:
+                widget.setEnabled(bool(preset.project_list))
 
         self.w_startRender.setEnabled(bool(preset.blender_exe and not preset.is_status('RENDERING') and preset.project_list and preset.get_global_frames_number()))
         self.w_stopRender.setEnabled(preset.is_status('RENDERING') and not preset.is_status('RENDERING_STOPPING'))
@@ -1025,6 +1116,11 @@ class MainWindow(qtw.QMainWindow):
         self.w_selective.setChecked(bool(preset.selective_render))
         # self.w_assign_srgb.setChecked(bool(preset.assign_srgb))
         self.w_preview_render.setChecked(bool(preset.preview_render))
+
+        for i in range(self.w_listOfProjects.count()):
+            item = self.w_listOfProjects.item(i)
+            w_project = self.w_listOfProjects.itemWidget(item)
+            w_project.update_widgets()
 
 
     def __log(self, text):
@@ -1054,52 +1150,357 @@ def log(*args, developer=False):
 
 ################################################################################
 
-windll.shell32.SetCurrentProcessExplicitAppUserModelID(APPID)
+ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APPID)
 store.app = app = qtw.QApplication([])
 store.mw = mw = MainWindow()
 store.preset = preset = QueuePreset()
 mw.update_widgets.emit()
 # app.setStyle("fusion")
+
+
 app.setStyleSheet('''
+* {
+    font-family: Segoe UI, Arial, sans-serif;
+}
+
 QLabel {
     font-size: 10px;
+    color: #e0e0e0;
 }
+
 QPushButton {
-    font-size: 10px;
+    font-size: 11px;
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #555555;
+    border-radius: 4px;
+    padding: 4px 8px;
 }
+
+QPushButton:hover {
+    background-color: #4a4a4a;
+    border: 1px solid #666666;
+}
+
+QPushButton:pressed {
+    background-color: #2a2a2a;
+}
+
+QPushButton:disabled {
+    background-color: #2a2a2a;
+    color: #707070;
+    border: 1px solid #404040;
+}
+
 QLineEdit {
     font-size: 10px;
-}
-QComboBox {
-    font-size: 10px;
-}
-QProgressBar {
-    background-color: rgb(200, 200, 200);
-    color: rgb(255, 255, 255);
-    border-style: none;
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    border: 1px solid #555555;
     border-radius: 4px;
-    text-align: center;
-    font-size: 12px;
+    padding: 2px;
+    selection-background-color: #448fff;
 }
-QProgressBar::chunk {
-    border-radius: 14px;
-    background-color: qlineargradient(
-        spread:pad, x1:0, y1:0.511364, x2:1, y2:0.523,
-        stop:0 rgba(38, 87, 135, 255),
-        stop:1 rgba(232, 125, 13, 255));
+
+QLineEdit:focus {
+    border: 1px solid #448fff;
 }
+
+QLineEdit:disabled {
+    background-color: #252525;
+    color: #707070;
+    border: 1px solid #404040;
+}
+
+QComboBox {
+    font-size: 11px;
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #555555;
+    border-radius: 4px;
+    padding: 5px;
+    min-height: 10px;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+
+QComboBox::down-arrow {
+    image: url(down_arrow.svg);
+    width: 12px;
+    height: 12px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #555555;
+    border-radius: 4px;
+    selection-background-color: #448fff;
+    selection-color: #ffffff;
+    font-size: 11px;
+}
+
+QComboBox:disabled {
+    background-color: #2a2a2a;
+    color: #707070;
+    border: 1px solid #404040;
+}
+
 QListWidget {
-    background-color: rgb(255, 255, 255);
-    color: rgb(25, 25, 25);
+    color: #e0e0e0;
     border-radius: 6px;
     padding: 2px;
     font-size: 12px;
+    border: 1px solid #555555;
+    outline: none;
 }
-QListView::item:selected {
-    color: #448fff;
-    background-color: rgb(255, 255, 255);
-    border: 1px solid #448fff;
+
+QListWidget::item {
+    padding: 4px;
+    border: 1px solid transparent;
     border-radius: 4px;
+    margin: 0px;
+}
+
+QListWidget::item:hover {
+    border: 1px solid #666666;
+    outline: none;
+}
+
+QListWidget::item:selected {
+    color: #ffffff;
+    border: 2px solid #448fff;
+    outline: none;
+}
+
+QListWidget::item:selected:active {
+    color: #1e1e1e;
+    background-color: #1e1e1e;
+    border: 2px solid #3377dd;
+    outline: none;
+}
+
+QScrollBar:vertical {
+    background-color: transparent;
+    width: 12px;
+    border: none;
+    margin: 0px;
+    padding: 0px;
+}
+
+QScrollBar::handle:vertical {
+    background-color: rgba(85, 85, 85, 120);
+    border-radius: 6px;
+    min-height: 20px;
+    margin: 2px 0px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: rgba(102, 102, 102, 180);
+}
+
+QScrollBar:vertical:hover {
+    background-color: rgba(45, 45, 45, 30);
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    border: none;
+    background: transparent;
+    height: 0px;
+}
+
+QScrollBar::up-arrow:vertical,
+QScrollBar::down-arrow:vertical,
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: transparent;
+    border: none;
+}
+
+QScrollBar:horizontal {
+    background-color: transparent;
+    height: 12px;
+    border: none;
+    margin: 0px;
+    padding: 0px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: rgba(85, 85, 85, 120);
+    border-radius: 6px;
+    min-width: 20px;
+    margin: 0px 2px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background-color: rgba(102, 102, 102, 180);
+}
+
+QScrollBar:horizontal:hover {
+    background-color: rgba(45, 45, 45, 30);
+}
+
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    border: none;
+    background: transparent;
+    width: 0px;
+}
+
+QScrollBar::left-arrow:horizontal,
+QScrollBar::right-arrow:horizontal,
+QScrollBar::add-page:horizontal,
+QScrollBar::sub-page:horizontal {
+    background: transparent;
+    border: none;
+}
+
+QMainWindow, QDialog, QWidget {
+    background-color: #1e1e1e;
+}
+
+QMenuBar {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    font-size: 11px;
+}
+
+QMenuBar::item:selected {
+    background-color: #448fff;
+}
+
+QMenu {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    border: 1px solid #555555;
+    font-size: 11px;
+}
+
+QMenu::item:selected {
+    background-color: #448fff;
+}
+
+QCheckBox, QRadioButton {
+    color: #e0e0e0;
+    font-size: 11px;
+}
+
+QCheckBox::indicator, QRadioButton::indicator {
+    width: 14px;
+    height: 14px;
+}
+
+QCheckBox::indicator:unchecked {
+    background-color: #2d2d2d;
+    border: 1px solid #555555;
+    border-radius: 3px;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #448fff;
+    border: 1px solid #448fff;
+    border-radius: 3px;
+}
+
+QGroupBox {
+    color: #e0e0e0;
+    border: 1px solid #555555;
+    border-radius: 5px;
+    margin-top: 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 5px 0 5px;
+}
+
+QTabWidget::pane {
+    border: 1px solid #555555;
+    background-color: #2d2d2d;
+    border-radius: 4px;
+}
+
+QTabBar::tab {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    padding: 6px 12px;
+    margin-right: 2px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    font-size: 11px;
+}
+
+QTabBar::tab:selected {
+    background-color: #448fff;
+    color: #ffffff;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #4a4a4a;
+}
+
+QTextEdit, QPlainTextEdit {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    border: 1px solid #555555;
+    border-radius: 4px;
+    padding: 5px;
+    font-size: 11px;
+    selection-background-color: #448fff;
+}
+
+QHeaderView::section {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    padding: 5px;
+    border: 1px solid #555555;
+    font-size: 11px;
+}
+
+QTableView, QTreeView {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    alternate-background-color: #252525;
+    selection-background-color: #448fff;
+    selection-color: #ffffff;
+    font-size: 11px;
+}
+
+QTableView::item, QTreeView::item {
+    padding: 2px;
+}
+
+QProgressBar {
+    border: none;
+    border-radius: 4px;
+    background-color: #37474f;
+    color: #e0e0e0;
+    text-align: center;
+    font-size: 11px;
+    height: 4px;
+}
+
+QProgressBar::chunk {
+    border-radius: 4px;
+    background-color: #448fff;
+    margin: 0px;
+}
+
+QToolTip {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #555555;
+    border-radius: 4px;
+    padding: 5px;
+    font-size: 11px;
 }
 ''')
 
@@ -1115,7 +1516,34 @@ if DEV_MODE:
 
 
 ############################################################################
+# Periodic Loop
+
+def __start_periodic(interval=1.0):
+    """
+    Start periodic function.
+    """
+
+    def loop():
+
+        while True:
+            preset = store.preset
+
+            if preset:
+                preset.periodic()
+
+            sleep(interval)
+
+    t = Thread(target=loop, daemon=True)
+    t.start()
+
+
+############################################################################
 # Run
+
+__start_periodic()
 
 mw.show()
 exit(app.exec_())
+
+
+

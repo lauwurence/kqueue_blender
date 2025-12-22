@@ -4,7 +4,7 @@
 DEV_MODE = False
 TITLE = "kQueue Blender"
 DEVELOPER = 'keyclap'
-VERSION = (0, 5)
+VERSION = (0, 6)
 APPID = f'{DEVELOPER}.{TITLE.replace(" ", "_")}.{".".join([str(v) for v in VERSION])}'.lower()
 
 ICON = "kqueue/icons/icon.svg"

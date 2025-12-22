@@ -269,25 +269,34 @@ class RenderListenThread(qtc.QThread):
                                 continue
 
                             self.listOfProjects_setCurrentItem.emit(item)
-                            self.listOfProjects_setStyleSheet.emit("""
-                                QListView::item:selected {
-                                    color: rgb(25, 25, 25);
-                                    background-color: rgb(255, 255, 255);
-                                    border: 1px solid #e87d0d;
-                                    border-radius: 4px;
-                                }
-                                QListView::item {
-                                    color: rgb(125, 125, 125);
-                                }
-                                QListWidget {
-                                    background-color: rgb(225, 225, 225);
-                                    color: rgb(25, 25, 25);
-                                    border-radius: 6px;
-                                    padding: 2px;
-                                    font-size: 12px;
-                                }
-                            """)
-                            break
+
+                            # self.listOfProjects_setStyleSheet.emit("""
+                            #     QListWidget {
+                            #         background-color: rgb(225, 225, 225);
+                            #         color: rgb(25, 25, 25);
+                            #     }
+                            # """)
+
+
+                            # self.listOfProjects_setStyleSheet.emit("""
+                            #     QListView::item:selected {
+                            #         color: rgb(25, 25, 25);
+                            #         background-color: rgb(255, 255, 255);
+                            #         border: 1px solid #e87d0d;
+                            #         border-radius: 4px;
+                            #     }
+                            #     QListView::item {
+                            #         color: rgb(125, 125, 125);
+                            #     }
+                            #     QListWidget {
+                            #         background-color: rgb(225, 225, 225);
+                            #         color: rgb(25, 25, 25);
+                            #         border-radius: 6px;
+                            #         padding: 2px;
+                            #         font-size: 12px;
+                            #     }
+                            # """)
+                            # break
 
                         continue
 
@@ -376,21 +385,21 @@ class RenderListenThread(qtc.QThread):
             log(f"Status: {preset.blender_status}")
 
         preset.set_status('READY_TO_RENDER')
-        self.listOfProjects_setStyleSheet.emit("""
-            QListWidget {
-                background-color: rgb(255, 255, 255);
-                color: rgb(25, 25, 25);
-                border-radius: 6px;
-                padding: 2px;
-                font-size: 12px;
-            }
-            QListView::item:selected {
-                color: #448fff;
-                background-color: rgb(255, 255, 255);
-                border: 1px solid #448fff;
-                border-radius: 4px;
-            }
-        """)
+        # self.listOfProjects_setStyleSheet.emit("""
+        #     QListWidget {
+        #         background-color: rgb(255, 255, 255);
+        #         color: rgb(25, 25, 25);
+        #         border-radius: 6px;
+        #         padding: 2px;
+        #         font-size: 12px;
+        #     }
+        #     QListView::item:selected {
+        #         color: #448fff;
+        #         background-color: rgb(255, 255, 255);
+        #         border: 1px solid #448fff;
+        #         border-radius: 4px;
+        #     }
+        # """)
 
         monitor.screen_on()
 

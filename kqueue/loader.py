@@ -27,6 +27,9 @@ class LoaderThread(qtc.QThread):
         preset = store.preset
         mw = store.mw
 
+        if preset.is_adding_projects:
+            return
+
         makedirs(store.temp_folder, exist_ok=True)
 
         preset.is_adding_projects = True
