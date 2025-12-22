@@ -658,6 +658,7 @@ class MainWindow(qtw.QMainWindow):
         for sample in [ 32, 64, 128, 256, 512, 1024, 2048, 4096 ]:
             w_setGlobalSamples = QPushButton(f'{sample}', clicked=toggle_global_active(sample))
             w_setGlobalSamples.setFixedWidth(48)
+            w_setGlobalSamples.setToolTip(f'Set {sample} samples globally.')
             w_hBoxLayout.addWidget(w_setGlobalSamples)
 
             self.w_setGlobalSamples_list.append(w_setGlobalSamples)
