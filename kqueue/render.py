@@ -207,8 +207,9 @@ class RenderTimerThread(qtc.QThread):
             current_time = time.time()
 
             # Elapsed time
-            elapsed_time = current_time - preset.global_render_start_time
-            m, s = divmod(elapsed_time, 60)
+            elasped_frame_time = current_time - preset.render_start_time
+            elapsed_global_time = current_time - preset.global_render_start_time
+            m, s = divmod(elapsed_global_time, 60)
             h, m = divmod(m, 60)
 
             # Average time
@@ -223,9 +224,16 @@ class RenderTimerThread(qtc.QThread):
             avg_h, avg_m = divmod(avg_m, 60)
 
             # Estimated time
-            eta_time = (preset.get_global_frames_number() + 1 - preset.global_frame) * avg_time
+            eta_time = (preset.global_frames + 1 - preset.global_frame) * avg_time
+
+            if eta_time > 0:
+                eta_time -= elasped_frame_time
+
             eta_m, eta_s = divmod(eta_time, 60)
             eta_h, eta_m = divmod(eta_m, 60)
+
+            if eta_time < 0:
+                print("eta:", eta_time, eta_h, eta_m, eta_s, "avg:", avg_time, "glob:", preset.global_frames, "fra:", preset.global_frame)
 
             tt = f'Elapsed: {h:02.0f}:{m:02.0f}:{s:02.0f} | AVG: {avg_h:02.0f}:{avg_m:02.0f}:{avg_s:02.0f} | ETA: {eta_h:02.0f}:{eta_m:02.0f}:{eta_s:02.0f}'
 
