@@ -150,6 +150,7 @@ blender --background "{project.file}" --scene "{sc}" -E "{'CYCLES' if not preset
 
 
                 self.listen_thread = RenderListenThread()
+                self.timer_thread = RenderTimerThread()
 
                 # self.listen_thread = qtc.QThread()
                 # self.listen_worker = RenderListenThread()
@@ -162,7 +163,9 @@ blender --background "{project.file}" --scene "{sc}" -E "{'CYCLES' if not preset
                 self.listen_thread.pProgress_setText.connect(mw.w_pProgress.setText)
 
                 self.listen_thread.rProgressBar_setValue.connect(mw.w_rProgressBar.setValue)
-                self.listen_thread.gProgressETA_setText.connect(mw.w_gProgressETA.setText)
+                # self.listen_thread.gProgressETA_setText.connect(mw.w_gProgressETA.setText)
+
+                self.timer_thread.gProgressETA_setText.connect(mw.w_gProgressETA.setText)
 
                 self.listen_thread.listOfProjects_setCurrentItem.connect(mw.w_listOfProjects.setCurrentItem)
                 self.listen_thread.listOfProjects_setStyleSheet.connect(mw.w_listOfProjects.setStyleSheet)
@@ -174,11 +177,61 @@ blender --background "{project.file}" --scene "{sc}" -E "{'CYCLES' if not preset
                 # self.listen_thread.finished.connect(self.listen_thread.deleteLater)
 
                 self.listen_thread.start()
+                self.timer_thread.start()
 
             preset.process.wait()
 
         if not preset.is_status('RENDERING_STOPPING'):
             preset.set_status('RENDERING_FINISHED')
+
+        self.finished.emit()
+
+
+################################################################################
+# Timer & ETA
+
+class RenderTimerThread(qtc.QThread):
+    gProgressETA_setText = qtc.pyqtSignal(str)
+
+    def __init__(self):
+        super().__init__()
+
+    def run(self):
+        preset = store.preset
+
+        while True:
+
+            if not preset.is_status('RENDERING'):
+                break
+
+            current_time = time.time()
+
+            # Elapsed time
+            elapsed_time = current_time - preset.global_render_start_time
+            m, s = divmod(elapsed_time, 60)
+            h, m = divmod(m, 60)
+
+            # Average time
+            avg_list = preset.render_avg_time[-3:]
+
+            if avg_list:
+                avg_time = sum(avg_list) / len(avg_list)
+            else:
+                avg_time = 0
+
+            avg_m, avg_s = divmod(avg_time, 60)
+            avg_h, avg_m = divmod(avg_m, 60)
+
+            # Estimated time
+            eta_time = (preset.get_global_frames_number() + 1 - preset.global_frame) * avg_time
+            eta_m, eta_s = divmod(eta_time, 60)
+            eta_h, eta_m = divmod(eta_m, 60)
+
+            tt = f'Elapsed: {h:02.0f}:{m:02.0f}:{s:02.0f} | AVG: {avg_h:02.0f}:{avg_m:02.0f}:{avg_s:02.0f} | ETA: {eta_h:02.0f}:{eta_m:02.0f}:{eta_s:02.0f}'
+
+            self.gProgressETA_setText.emit(tt)
+
+            time.sleep(1.0)
 
         self.finished.emit()
 
@@ -196,7 +249,6 @@ class RenderListenThread(qtc.QThread):
     pProgress_setText = qtc.pyqtSignal(str)
 
     rProgressBar_setValue = qtc.pyqtSignal(int)
-    gProgressETA_setText = qtc.pyqtSignal(str)
 
     listOfProjects_setCurrentItem = qtc.pyqtSignal(object)
     listOfProjects_setStyleSheet = qtc.pyqtSignal(str)
@@ -228,29 +280,6 @@ class RenderListenThread(qtc.QThread):
 
                     current_time = time.time()
 
-                    # Elapsed time
-                    elapsed_time = current_time - preset.global_render_start_time
-                    m, s = divmod(elapsed_time, 60)
-                    h, m = divmod(m, 60)
-
-                    # Average time
-                    avg_list = preset.render_avg_time[-3:]
-
-                    if avg_list:
-                        avg_time = sum(avg_list) / len(avg_list)
-                    else:
-                        avg_time = 0
-
-                    avg_m, avg_s = divmod(avg_time, 60)
-                    avg_h, avg_m = divmod(avg_m, 60)
-
-                    # Estimated time
-                    eta_time = (preset.get_global_frames_number() + 1 - preset.global_frame) * avg_time
-                    eta_m, eta_s = divmod(eta_time, 60)
-                    eta_h, eta_m = divmod(eta_m, 60)
-
-                    self.gProgressETA_setText.emit(f'Elapsed: {h:02.0f}:{m:02.0f}:{s:02.0f} | AVG: {avg_h:02.0f}:{avg_m:02.0f}:{avg_s:02.0f} | ETA: {eta_h:02.0f}:{eta_m:02.0f}:{eta_s:02.0f}')
-
                     # Change project
                     found = search(r'(?:.*)--background ["](.*?.blend)["].*?-f ["](.*?)["]', line)
 
@@ -270,37 +299,9 @@ class RenderListenThread(qtc.QThread):
 
                             self.listOfProjects_setCurrentItem.emit(item)
 
-                            # self.listOfProjects_setStyleSheet.emit("""
-                            #     QListWidget {
-                            #         background-color: rgb(225, 225, 225);
-                            #         color: rgb(25, 25, 25);
-                            #     }
-                            # """)
-
-
-                            # self.listOfProjects_setStyleSheet.emit("""
-                            #     QListView::item:selected {
-                            #         color: rgb(25, 25, 25);
-                            #         background-color: rgb(255, 255, 255);
-                            #         border: 1px solid #e87d0d;
-                            #         border-radius: 4px;
-                            #     }
-                            #     QListView::item {
-                            #         color: rgb(125, 125, 125);
-                            #     }
-                            #     QListWidget {
-                            #         background-color: rgb(225, 225, 225);
-                            #         color: rgb(25, 25, 25);
-                            #         border-radius: 6px;
-                            #         padding: 2px;
-                            #         font-size: 12px;
-                            #     }
-                            # """)
-                            # break
-
                         continue
 
-                    # Local progress <100%
+                    # Local progress <100% with Tiles
                     found = search(r'(?:.*)Rendered (\d+)/(\d+) Tiles, Sample (\d+)/(\d+)', line)
 
                     if found:
@@ -309,6 +310,18 @@ class RenderListenThread(qtc.QThread):
                         sample = int(found.group(3))
                         samples = int(found.group(4))
                         progress = max(0.0, min(1.0, (tile * samples + sample) / (tiles * samples)))
+
+                        self.rProgressBar_setValue.emit(round(progress * 100))
+
+                        continue
+
+                    # Local progress <100%
+                    found = search(r'(?:.*)Sample (\d+)/(\d+)', line)
+
+                    if found:
+                        sample = int(found.group(1))
+                        samples = int(found.group(2))
+                        progress = max(0.0, min(1.0, float(sample) / float(samples)))
 
                         self.rProgressBar_setValue.emit(round(progress * 100))
 
@@ -385,21 +398,6 @@ class RenderListenThread(qtc.QThread):
             log(f"Status: {preset.blender_status}")
 
         preset.set_status('READY_TO_RENDER')
-        # self.listOfProjects_setStyleSheet.emit("""
-        #     QListWidget {
-        #         background-color: rgb(255, 255, 255);
-        #         color: rgb(25, 25, 25);
-        #         border-radius: 6px;
-        #         padding: 2px;
-        #         font-size: 12px;
-        #     }
-        #     QListView::item:selected {
-        #         color: #448fff;
-        #         background-color: rgb(255, 255, 255);
-        #         border: 1px solid #448fff;
-        #         border-radius: 4px;
-        #     }
-        # """)
 
         monitor.screen_on()
 

@@ -359,6 +359,9 @@ class QueuePreset():
         """
         """
 
+        if self.is_status('RENDERING', 'RENDERING_STOPPING'):
+            return
+
         mw.update_widgets.emit()
 
 
