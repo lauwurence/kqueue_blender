@@ -1091,6 +1091,7 @@ class MainWindow(qtw.QMainWindow):
             self.w_global_reload.setEnabled(False)
 
             self.w_logStatus.setImage("kqueue/icons/status_loading.svg")
+            self.w_global_active.setEnabled(False)
 
             for widget in self.w_setGlobalSamples_list:
                 widget.setEnabled(False)
@@ -1109,6 +1110,8 @@ class MainWindow(qtw.QMainWindow):
                 self.w_logStatus.setImage("kqueue/icons/status_loading.svg")
             else:
                 self.w_logStatus.setImage("kqueue/icons/status_idle.svg")
+
+            self.w_global_active.setEnabled(True)
 
             for widget in self.w_setGlobalSamples_list:
                 widget.setEnabled(bool(preset.project_list))
