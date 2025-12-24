@@ -6,7 +6,7 @@ Queue Blender projects and override settings.
 ## What can it do:
 1. Save and load kQueue files.
 2. Fetch and cache Blender project data.
-3. Exclude specific Blender projects from render queue. 
+3. Exclude specific Blender projects from render queue.
 4. Render specific frame ranges, override render settings.
 5. Render in render preview mode (Workbench rendered, SubD 0).
 6. Render only non-existing images.
@@ -19,7 +19,7 @@ Queue Blender projects and override settings.
 Required libraries: PyQt5 (to draw the UI), psutil (to kill processes), pygame (to play sounds).
 Install Python 3 and put this into the console:
 ```
-pip install PyQt5; psutil; pygame
+pip install PyQt5; pywin32; psutil; pygame; numpy
 ```
 
 ## Run:

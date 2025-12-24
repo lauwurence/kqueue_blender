@@ -668,6 +668,7 @@ class MainWindow(qtw.QMainWindow):
         for sample in [ 32, 64, 128, 256, 512, 1024, 2048, 4096 ]:
             w_setGlobalSamples = QPushButton(f'{sample}', clicked=toggle_global_active(sample))
             w_setGlobalSamples.setFixedWidth(48)
+            w_setGlobalSamples.setFixedHeight(24)
             w_setGlobalSamples.setToolTip(f'Set {sample} samples globally.')
             w_hBoxLayout.addWidget(w_setGlobalSamples)
 
@@ -678,6 +679,7 @@ class MainWindow(qtw.QMainWindow):
         self.w_global_reload.setIcon(qtg.QIcon('kqueue/icons/reload_project.svg'))
         self.w_global_reload.setToolTip("Reload all the projects.")
         self.w_global_reload.setFixedWidth(24)
+        self.w_global_reload.setFixedHeight(24)
         w_hBoxLayout.addWidget(self.w_global_reload)
 
         # # [label] Global Settings
