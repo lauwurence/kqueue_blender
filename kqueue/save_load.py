@@ -1,16 +1,42 @@
 ################################################################################
-## Save and Load kQueue Files
+## Save and Load
 
-import json
 import pickle
 
 from pathlib import Path
 from . import store
 
+__cache = None
+__persistent = None
 
-def load_file(filename):
+
+def save_project_file(data, filename, version, backup=True):
     """
-    Load file.
+    Save project file.
+
+    `backup` - create a backup file with a "1" suffix.
+    """
+
+    file = Path(filename)
+
+    if backup:
+
+        if file.exists():
+            file_backup = Path(str(file) + "1")
+
+            if file_backup.exists():
+                file_backup.unlink()
+
+            file.rename(file_backup)
+
+    with open(file, 'wb') as f:
+        pickle.dump(version, f)
+        pickle.dump(data, f)
+
+
+def load_project_file(filename):
+    """
+    Load project file.
     """
 
     file = Path(filename)
@@ -33,45 +59,69 @@ def load_file(filename):
     return version, data
 
 
-def save_file(data, filename, version, backup=True):
-    """
-    Save file.
-
-    `backup` - create a backup file with a "1" suffix.
-    """
-
-    file = Path(filename)
-
-    if backup:
-
-        if file.exists():
-            file_backup = Path(str(file) + "1")
-
-            if file_backup.exists():
-                file_backup.unlink()
-
-            file.rename(file_backup)
-
-    with open(file, 'wb') as f:
-        pickle.dump(version, f)
-        pickle.dump(data, f)
-
-
-def load_cache():
-    """
-    Load cache file data.
-    """
-
-    with open(store.cache_file, 'r') as f:
-        data = json.load(f)
-
-    return data
-
-
 def save_cache(data):
     """
     Save cache data into file.
     """
 
-    with open(store.cache_file, 'w') as f:
-        f.write(json.dumps(data, indent=4))
+    global __cache
+
+    __cache = data
+
+    __save(data, file=store.cache_file)
+
+
+def load_cache(file=None):
+    """
+    Load cache file data.
+    """
+
+    global __cache
+
+    if __cache:
+        return __cache
+
+    return __load(file=store.cache_file)
+
+
+def save_persistent(data):
+    """
+    """
+
+    global __persistent
+
+    __persistent = data
+
+    __save(data, file=store.persistent_file)
+
+
+def load_persistent():
+    """
+    """
+
+    global __persistent
+
+    if __persistent:
+        return __persistent
+
+    return __load(file=store.persistent_file)
+
+
+def __save(data, file):
+
+    if not file.exists():
+        file.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(file, 'wb') as f:
+        pickle.dump(data, f)
+
+
+def __load(file):
+
+    if not file.exists():
+        return {}
+
+    with open(file, 'rb') as f:
+        data = pickle.load(f)
+
+    return data

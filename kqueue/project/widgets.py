@@ -7,7 +7,7 @@ import PyQt5.QtCore as qtc
 from PyQt5.QtCore import Qt
 
 from ..widgets.QPushButton import QPushButton
-from ..utils.path import join
+from ..utils.pathutils import join
 from ..config import *
 from .. import store
 
@@ -72,7 +72,7 @@ class QBlendProject(qtw.QWidget):
         self.w_open_render_image.setIcon(qtg.QIcon('kqueue/icons/open_render.svg'))
         self.w_open_render_image.setToolTip("Open the last render.")
         self.w_open_render_image.setIconSize(qtc.QSize(14, 14))
-        self.w_open_render_image.setFixedWidth(24)
+        self.w_open_render_image.setFixedSize(20, 20)
         self.w_open_render_image.setFlat(True)
         self.w_hBoxLayout.addWidget(self.w_open_render_image)
 
@@ -81,7 +81,7 @@ class QBlendProject(qtw.QWidget):
         self.w_open_render_folder.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
         self.w_open_render_folder.setToolTip("Open render folder.")
         self.w_open_render_folder.setIconSize(qtc.QSize(14, 14))
-        self.w_open_render_folder.setFixedWidth(24)
+        self.w_open_render_folder.setFixedSize(20, 20)
         self.w_open_render_folder.setFlat(True)
         self.w_hBoxLayout.addWidget(self.w_open_render_folder)
 
@@ -118,8 +118,9 @@ class QBlendProject(qtw.QWidget):
             # [button] Start
             self.w_open = QPushButton("", clicked=lambda: self.project.open_file())
             self.w_open.setIcon(qtg.QIcon('kqueue/icons/blender_bw.svg'))
+            self.w_open.setIconSize(qtc.QSize(16, 16))
+            self.w_open.setFixedSize(20, 20)
             self.w_open.setToolTip("Open the Blender project.")
-            self.w_open.setFixedWidth(24)
             self.w_hBoxLayout.addWidget(self.w_open)
 
             if self.project.is_outdated():
@@ -127,8 +128,9 @@ class QBlendProject(qtw.QWidget):
                 # [button] Reload
                 self.w_reload = QPushButton("", clicked=lambda: self.project.reload())
                 self.w_reload.setIcon(qtg.QIcon('kqueue/icons/reload_project.svg'))
+                self.w_reload.setIconSize(qtc.QSize(16, 16))
+                self.w_reload.setFixedSize(20, 20)
                 self.w_reload.setToolTip("Reload the Blender project.")
-                self.w_reload.setFixedWidth(24)
                 self.w_hBoxLayout.addWidget(self.w_reload)
 
         else:
@@ -154,7 +156,7 @@ class QBlendProject(qtw.QWidget):
     def set_frames(self, frames):
         self.w_frames.setText(f'| Frames: [{frames}]')
 
-        if self.project.frames_overriden():
+        if self.project.frames_overrode():
             self.w_frames.setStyleSheet("font-weight: bold;")
 
     def set_samples(self, samples):
@@ -188,7 +190,7 @@ class QBlendProjectSettings(qtw.QWidget):
         self.setFixedHeight(400)
         self.setWindowModality(Qt.ApplicationModal)
 
-        # ! [vbox]
+        # [vbox]
         layout = qtw.QVBoxLayout()
         self.setLayout(layout)
 
@@ -196,10 +198,25 @@ class QBlendProjectSettings(qtw.QWidget):
         l_form = qtw.QFormLayout()
         layout.addLayout(l_form)
 
-        # [edit] Frames
-        self.w_frames = w_frames = qtw.QLineEdit(str(project.get_frames()))
-        w_frames.setPlaceholderText(str(project.frames))
-        l_form.addRow("Frames", self.w_frames)
+
+        # [hbox] Frames
+        w_hBoxLayoutFrames = qtw.QHBoxLayout()
+        l_form.addRow("Frames", w_hBoxLayoutFrames)
+
+        if True:
+
+            # [edit] Frames
+            self.w_frames = w_frames = qtw.QLineEdit(str(project.get_frames()))
+            w_frames.setPlaceholderText(str(project.frames))
+            w_hBoxLayoutFrames.addWidget(w_frames)
+
+            # [button] Frames Reset
+            w_framesReset = QPushButton("", clicked=lambda: self.w_frames.setText(str(project.get_frames())))
+            w_framesReset.setIcon(qtg.QIcon('kqueue/icons/reload_project.svg'))
+            w_framesReset.setFixedWidth(30)
+            w_framesReset.setIconSize(qtc.QSize(18, 18))
+            w_hBoxLayoutFrames.addWidget(w_framesReset)
+
 
         # # [label] Frames Result
         # self.w_result = w_result = qtw.QLabel("")
@@ -213,31 +230,37 @@ class QBlendProjectSettings(qtw.QWidget):
         # w_frames.
         # w_result.setText("!")
 
+
         # [edit] Samples
         self.w_samples = w_samples = qtw.QLineEdit(str(project.get_samples()))
         w_samples.setPlaceholderText(str(project.samples))
         w_samples.setValidator(qtg.QIntValidator(1, 99999, self))
         l_form.addRow("Samples", w_samples)
 
-        # ! [hbox] Render Filepath
+
+        # [hbox] Render Filepath
         w_hBoxLayoutRenderFilepath = qtw.QHBoxLayout()
         l_form.addRow("Render Filepath", w_hBoxLayoutRenderFilepath)
 
-        # [edit] Render Filepath
-        self.w_renderFilepath = w_renderFilepath = qtw.QLineEdit(str(project.get_render_filepath()))
-        w_renderFilepath.setPlaceholderText(str(project.render_filepath))
-        w_hBoxLayoutRenderFilepath.addWidget(w_renderFilepath)
+        if True:
 
-        # [button] Render Filepath
-        def locate_filepath():
-            filepath, _ = qtw.QFileDialog.getSaveFileName(self, 'Set Render Filepath', w_renderFilepath.text())
-            if not filepath: return
-            w_renderFilepath.setText(join(filepath))
-        w_locateFilepath = QPushButton("", clicked=locate_filepath)
-        w_locateFilepath.clicked.connect(lambda: store.mw.update_widgets.emit())
-        w_locateFilepath.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
-        w_locateFilepath.setFixedWidth(30)
-        w_hBoxLayoutRenderFilepath.addWidget(w_locateFilepath)
+            # [edit] Render Filepath
+            self.w_renderFilepath = w_renderFilepath = qtw.QLineEdit(str(project.get_render_filepath()))
+            w_renderFilepath.setPlaceholderText(str(project.render_filepath))
+            w_hBoxLayoutRenderFilepath.addWidget(w_renderFilepath)
+
+            # [button] Render Filepath
+            def locate_filepath():
+                filepath, _ = qtw.QFileDialog.getSaveFileName(self, 'Set Render Filepath', w_renderFilepath.text())
+                if not filepath: return
+                w_renderFilepath.setText(join(filepath))
+            w_locateFilepath = QPushButton("", clicked=locate_filepath)
+            w_locateFilepath.clicked.connect(lambda: store.mw.update_widgets.emit())
+            w_locateFilepath.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
+            w_locateFilepath.setFixedWidth(30)
+            w_locateFilepath.setIconSize(qtc.QSize(18, 18))
+            w_hBoxLayoutRenderFilepath.addWidget(w_locateFilepath)
+
 
         # [edit] File Format
         self.w_fileFormat = w_fileFormat = qtw.QComboBox()
@@ -245,17 +268,20 @@ class QBlendProjectSettings(qtw.QWidget):
         w_fileFormat.setCurrentText(str(project.get_file_format()))
         l_form.addRow("File Format", w_fileFormat)
 
+
         # [edit] Camera
         self.w_camera = w_camera = qtw.QComboBox()
         w_camera.addItems(project.camera_list)
         w_camera.setCurrentText(str(project.get_camera()))
         l_form.addRow("Camera", w_camera)
 
+
         # [edit] Scene
         self.w_scene = w_scene = qtw.QComboBox()
         w_scene.addItems(project.scene_list)
         w_scene.setCurrentText(str(project.get_scene()))
         l_form.addRow("Scene", w_scene)
+
 
         # [edit] Persistent
         self.w_usePersistentData = w_usePersistentData = QPushButton(str(project.get_use_persistent_data()))
@@ -264,12 +290,14 @@ class QBlendProjectSettings(qtw.QWidget):
         w_usePersistentData.clicked.connect(lambda: w_usePersistentData.setText(str(w_usePersistentData.isChecked())))
         l_form.addRow("Persistent Data", w_usePersistentData)
 
-        # [edit] Persistent
+
+        # [edit] Adaptive Sampling
         self.w_useAdaptiveSampling = w_useAdaptiveSampling = QPushButton(str(project.get_use_adaptive_sampling()))
         w_useAdaptiveSampling.setCheckable(True)
         w_useAdaptiveSampling.setChecked(project.get_use_adaptive_sampling())
         w_useAdaptiveSampling.clicked.connect(lambda: w_useAdaptiveSampling.setText(str(w_useAdaptiveSampling.isChecked())))
         l_form.addRow("Adaptive Sampling", w_useAdaptiveSampling)
+
 
         # [edit] Denoiser
         self.w_denoiser = w_denoiser = qtw.QComboBox()
@@ -296,21 +324,25 @@ class QBlendProjectSettings(qtw.QWidget):
         w_denoiserPrefilter.setCurrentText(str(project.get_denoising_prefilter()))
         l_form.addRow("Prefilter", w_denoiserPrefilter)
 
-        # ! [hbox] Save & Cancel
+
+        # [hbox] Save & Cancel
         w_hBoxLayout = qtw.QHBoxLayout()
         layout.addLayout(w_hBoxLayout)
 
-        # [button] Save
-        w_save = QPushButton("Save", clicked=lambda: self.save_and_close())
-        w_save.setFixedWidth(100)
-        w_save.setFixedHeight(30)
-        w_hBoxLayout.addWidget(w_save, 0, Qt.AlignRight)
+        if True:
 
-        # [button] Cancel
-        w_cancel = QPushButton("Cancel", clicked=lambda: self.close())
-        w_cancel.setFixedWidth(100)
-        w_cancel.setFixedHeight(30)
-        w_hBoxLayout.addWidget(w_cancel)
+            # [button] Save
+            w_save = QPushButton("Save", clicked=lambda: self.save_and_close())
+            w_save.setFixedWidth(100)
+            w_save.setFixedHeight(30)
+            w_hBoxLayout.addWidget(w_save, 0, Qt.AlignRight)
+
+            # [button] Cancel
+            w_cancel = QPushButton("Cancel", clicked=lambda: self.close())
+            w_cancel.setFixedWidth(100)
+            w_cancel.setFixedHeight(30)
+            w_hBoxLayout.addWidget(w_cancel)
+
 
         self.update_frames_result()
 
@@ -348,12 +380,15 @@ class QBlendProjectSettings(qtw.QWidget):
         Save values and set need save if something changed.
         """
 
-        def set_value(variable, value):
+        def set_value(name, new_value):
+            new_value = new_value or None
+            old_value = getattr(self.project, name)
 
-            if getattr(self.project, variable) == value:
+            if new_value == old_value:
                 return
 
-            setattr(self.project, variable, value or None)
+            print(name, old_value, "=>", new_value)
+            setattr(self.project, name, new_value)
             store.preset.set_need_save()
 
         set_value('frames_override', self.w_frames.text())

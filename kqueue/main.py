@@ -1,6 +1,7 @@
 ################################################################################
 ## Main
 
+import os
 import ctypes
 import subprocess
 
@@ -18,13 +19,13 @@ from psutil import Process
 from threading import Thread
 
 from .utils import monitor
-from .utils.path import join, open_folder, open_image
+from .utils.pathutils import join, open_folder, open_image
 from .project.widgets import QBlendProject, QBlendProjectSettings
 
 from .render import RenderThread
 from .loader import LoaderThread
 from .config import *
-from . import store
+from . import store, save_load
 
 from .widgets.QPushButton import QPushButton
 
@@ -34,11 +35,21 @@ if hasattr(Qt, 'AA_EnableHighDpiScaling'):
 if hasattr(Qt, 'AA_UseHighDpiPixmaps'):
     qtw.QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
+active_monitor = monitor.get_primary_display_info()
+factor = 1.0 + (1080 / active_monitor.height) * 0.5
+
+if DEV_MODE:
+    print(f'Monitor: {active_monitor.width}x{active_monitor.height} | Scale: {factor}')
+
+os.environ["QT_SCALE_FACTOR"] = f'{factor}'
+
+
 ################################################################################
 
 # Init path variables
 store.working_dir = join(getcwd() + "/kqueue")
 store.cache_file = Path(join(getcwd(), CACHE_FILE))
+store.persistent_file = Path(join(getcwd(), PERSISTENT_FILE))
 store.bridge_file = Path(join(getcwd(), BRIDGE_FILE))
 store.get_data_py = Path(join(getcwd(), GET_DATA_PY))
 store.get_data_bat = Path(join(getcwd(), GET_DATA_BAT))
@@ -218,8 +229,7 @@ class QueuePreset():
         if not filename:
             return
 
-        from .save_load import save_file
-        save_file([self.project_list, self.blender_exe], filename, version=1)
+        save_load.save_project_file([self.project_list, self.blender_exe], filename, version=1)
 
         self.set_save(filename)
         self.set_need_save(False)
@@ -243,8 +253,7 @@ class QueuePreset():
         if not filename:
             return
 
-        from .save_load import save_file
-        save_file([self.project_list, self.blender_exe], filename, version=1)
+        save_load.save_project_file([self.project_list, self.blender_exe], filename, version=1)
 
         self.set_save(filename)
         self.set_need_save(False)
@@ -270,8 +279,7 @@ class QueuePreset():
             if not filename:
                 return
 
-        from .save_load import load_file
-        version, data = load_file(filename)
+        version, data = save_load.load_project_file(filename)
 
         if not data:
             return
@@ -287,6 +295,11 @@ class QueuePreset():
         mw.update_widgets.emit()
 
         log(f'Loaded: {filename}')
+
+        # Save persistent
+        persistent_data = save_load.load_persistent()
+        persistent_data['last_project_filename'] = filename
+        save_load.save_persistent(persistent_data)
 
 
     def set_save(self, filename):
@@ -558,6 +571,7 @@ class MainWindow(qtw.QMainWindow):
             self.w_locateSave = w_locateSave = QPushButton("", clicked=lambda: preset.save_as())
             w_locateSave.clicked.connect(lambda: self.update_widgets.emit())
             w_locateSave.setIcon(qtg.QIcon('kqueue/icons/save.svg'))
+            w_locateSave.setIconSize(qtc.QSize(18, 18))
             w_locateSave.setFixedHeight(26)
             w_locateSave.setToolTip("Save the current file in the desired location.")
             w_locateSave.setShortcut(qtg.QKeySequence("Ctrl+Shift+S"))
@@ -570,6 +584,7 @@ class MainWindow(qtw.QMainWindow):
             self.w_locateLoad = w_locateLoad = QPushButton("", clicked=lambda: preset.load_from())
             w_locateLoad.clicked.connect(lambda: self.update_widgets.emit())
             w_locateLoad.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
+            w_locateLoad.setIconSize(qtc.QSize(18, 18))
             w_locateLoad.setFixedHeight(26)
             w_locateLoad.setToolTip("Open a kQueue file.")
             w_hBoxLayout.addWidget(w_locateLoad)
@@ -1170,8 +1185,6 @@ ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APPID)
 store.app = app = qtw.QApplication([])
 store.mw = mw = MainWindow()
 store.preset = preset = QueuePreset()
-mw.update_widgets.emit()
-# app.setStyle("fusion")
 
 
 app.setStyleSheet('''
@@ -1180,12 +1193,12 @@ app.setStyleSheet('''
 }
 
 QLabel {
-    font-size: 10px;
+    font-size: 11px;
     color: #e0e0e0;
 }
 
 QLabel:disabled {
-    font-size: 10px;
+    font-size: 11px;
     color: #707070;
 }
 
@@ -1214,7 +1227,7 @@ QPushButton:disabled {
 }
 
 QLineEdit {
-    font-size: 10px;
+    font-size: 11px;
     background-color: #2d2d2d;
     color: #e0e0e0;
     border: 1px solid #555555;
@@ -1240,7 +1253,7 @@ QComboBox {
     border: 1px solid #555555;
     border-radius: 4px;
     padding: 5px;
-    min-height: 10px;
+    min-height: 11px;
 }
 
 QComboBox::drop-down {
@@ -1249,7 +1262,7 @@ QComboBox::drop-down {
 }
 
 QComboBox::down-arrow {
-    image: url(down_arrow.svg);
+    image: url(kqueue/icons/play.svg);
     width: 12px;
     height: 12px;
 }
@@ -1410,6 +1423,11 @@ QCheckBox, QRadioButton {
     font-size: 11px;
 }
 
+QCheckBox:disabled, QRadioButton:disabled {
+    color: #707070;
+    font-size: 11px;
+}
+
 QCheckBox::indicator, QRadioButton::indicator {
     width: 14px;
     height: 14px;
@@ -1536,16 +1554,6 @@ QToolTip {
 
 
 ############################################################################
-
-if DEV_MODE:
-    preset.load_from("F:/RenPy/00_Renders/kqueue_blender/kqueue/saves/06_Night.kqp")
-    # preset.set_blender("H:/Blender Foundation/blender-5.0.0/blender.exe")
-    # preset.add_projects("I:/Blender Library/00_Parts/00_Intro/03_HomeRoaming (old)/001.blend")
-    #                     "I:/Blender Library/00_Parts/00_Intro/00_Inside/002_GuitarTuning.blend")
-    # mw.update_widgets.emit()
-
-
-############################################################################
 # Periodic Loop
 
 def __start_periodic(interval=1.0):
@@ -1570,10 +1578,15 @@ def __start_periodic(interval=1.0):
 ############################################################################
 # Run
 
-__start_periodic()
 
-mw.show()
-exit(app.exec_())
+def main():
+    __start_periodic()
 
+    persistent_data = save_load.load_persistent()
+    last_project_filename = persistent_data.get('last_project_filename')
 
+    if last_project_filename:
+        preset.load_from(last_project_filename)
 
+    mw.show()
+    exit(app.exec_())

@@ -3,3 +3,4 @@ psutil
 pygame
 numpy
 pywin32
+screeninfo

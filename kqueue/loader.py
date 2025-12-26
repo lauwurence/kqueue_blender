@@ -7,7 +7,7 @@ import json
 
 from os import makedirs
 from pathlib import Path
-from .utils.path import join
+from .utils.pathutils import join
 from .config import *
 from . import store
 from .project.object import BlendProject
@@ -39,7 +39,8 @@ class LoaderThread(qtc.QThread):
         cache = save_load.load_cache()
 
         files = [ join(file) for file in self.files if file.endswith(".blend")]
-        at_least_one = False
+        loaded_projects_list = []
+        need_save = False
 
         for i, file in enumerate(files):
             mod_time = int(Path(file).stat().st_mtime)
@@ -55,7 +56,7 @@ class LoaderThread(qtc.QThread):
                 project = p
                 break
 
-            if not at_least_one:
+            if not loaded_projects_list:
                 print("------------------------")
                 main.log("Loading new projects...")
 
@@ -128,6 +129,7 @@ blender "{file}" --factory-startup --background  --python "{store.get_data_py.re
 
             if project is None:
                 preset.project_list.append(loaded_project)
+                need_save = True
 
             else:
 
@@ -156,15 +158,32 @@ blender "{file}" --factory-startup --background  --python "{store.get_data_py.re
                     if not hasattr(loaded_project, name):
                         continue
 
-                    setattr(project, name, getattr(loaded_project, name))
+                    new_value = getattr(loaded_project, name)
+                    old_value = getattr(project, name)
+
+                    if new_value == old_value:
+                        continue
+
+                    setattr(project, name, new_value)
+
+                    if name not in ['mod_time']:
+                        need_save = True
+
+                        print(name, old_value, "=>", new_value)
 
             mw.update_list.emit(False)
             mw.update_widgets.emit()
-            at_least_one = True
 
-        if at_least_one:
-            preset.set_need_save()
-            main.log(f'All projects loaded!')
+            loaded_projects_list.append(loaded_project)
+
+        if loaded_projects_list:
+
+            if need_save:
+                preset.set_need_save()
+                main.log(f'All projects loaded!')
+
+            else:
+                main.log(f'No new data loaded.')
 
         preset.is_adding_projects = False
 

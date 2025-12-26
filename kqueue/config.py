@@ -4,7 +4,7 @@
 DEV_MODE = False
 TITLE = "kQueue Blender"
 DEVELOPER = 'keyclap'
-VERSION = (0, 6)
+VERSION = (0, 7)
 APPID = f'{DEVELOPER}.{TITLE.replace(" ", "_")}.{".".join([str(v) for v in VERSION])}'.lower()
 
 ICON = "kqueue/icons/icon.svg"
@@ -15,7 +15,8 @@ RENDER_FINISH_AUDIO = "kqueue/audio/render_finished.ogg"
 SAVE_FOLDER = "saves/"
 TEMP_FOLDER = "kqueue/blender/temp/"
 
-CACHE_FILE = "kqueue/blender/cache.json"
+CACHE_FILE = "kqueue/blender/.cache"
+PERSISTENT_FILE = f"kqueue/{SAVE_FOLDER}/.persistent"
 BRIDGE_FILE = f"{TEMP_FOLDER}data.json"
 GET_DATA_BAT = f"{TEMP_FOLDER}get_data.bat"
 GET_DATA_PY = "kqueue/blender/get_data.py"

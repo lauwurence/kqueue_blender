@@ -1,11 +1,13 @@
 ################################################################################
+## Monitor Utils
 
-# import ctypes
 import win32api
 import win32con
 
 from threading import Thread
 from time import sleep
+from screeninfo import get_monitors
+
 
 def screen_off(delay=0.0):
 
@@ -46,3 +48,13 @@ def screen_on(delay=0.0):
         t.start()
     else:
         func()
+
+
+def get_primary_display_info():
+    """
+    Get primary display info.
+    """
+
+    monitors = get_monitors()
+
+    return next((m for m in monitors if m.is_primary), monitors[0])

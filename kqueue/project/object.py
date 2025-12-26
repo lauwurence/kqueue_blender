@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 from ..utils.filter_frames import filter_frames
-from ..utils.path import join, exists, open_folder, open_image
+from ..utils.pathutils import join, exists, open_folder, open_image
 from ..config import *
 from .. import store, save_load
 
@@ -93,18 +93,16 @@ class BlendProject():
 
 
     def get_frames(self):
-        """
-        Get frames as a string.
-        """
-
+        """ Get frames list as a string. """
         return self.get(self.frames_override, self.frames) or ""
 
-
-    def frames_overriden(self):
-        """
-        """
-
+    def frames_overrode(self):
+        """ Are frames overrode? """
         return self.get_frames() != self.frames
+
+    def reset_frames_override(self):
+        """ Reset frames override settings. """
+        self.frames_override = None
 
 
     def get_markers(self):
@@ -167,7 +165,7 @@ class BlendProject():
     def get(self, v1, v2, other_list=None):
         rv = v1 if v1 is not None else v2
 
-        if other_list is not None and (rv not in other_list):
+        if other_list and (rv not in other_list):
             return other_list[0]
 
         return rv

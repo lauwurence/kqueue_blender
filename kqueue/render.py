@@ -8,7 +8,7 @@ import PyQt5.QtCore as qtc
 from re import search
 from io import TextIOWrapper
 from pathlib import Path
-from .utils.path import join
+from .utils.pathutils import join
 from .utils import monitor, audio
 from .config import *
 from . import store, main
