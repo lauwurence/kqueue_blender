@@ -18,7 +18,7 @@ from pathlib import Path
 from psutil import Process
 from threading import Thread
 
-from .utils import monitor
+from .utils import monitor, utils
 from .utils.pathutils import join, open_folder, open_image
 from .project.widgets import QBlendProject, QBlendProjectSettings
 
@@ -682,8 +682,7 @@ class MainWindow(qtw.QMainWindow):
 
         for sample in [ 32, 64, 128, 256, 512, 1024, 2048, 4096 ]:
             w_setGlobalSamples = QPushButton(f'{sample}', clicked=toggle_global_active(sample))
-            w_setGlobalSamples.setFixedWidth(48)
-            w_setGlobalSamples.setFixedHeight(24)
+            w_setGlobalSamples.setFixedSize(48, 24)
             w_setGlobalSamples.setToolTip(f'Set {sample} samples globally.')
             w_hBoxLayout.addWidget(w_setGlobalSamples)
 
@@ -692,9 +691,9 @@ class MainWindow(qtw.QMainWindow):
         # [button] Reload
         self.w_global_reload = QPushButton("", clicked=lambda: preset.reload_projects())
         self.w_global_reload.setIcon(qtg.QIcon('kqueue/icons/reload_project.svg'))
-        self.w_global_reload.setToolTip("Reload all the projects.")
-        self.w_global_reload.setFixedWidth(24)
-        self.w_global_reload.setFixedHeight(24)
+        self.w_global_reload.setIconSize(qtc.QSize(17, 17))
+        self.w_global_reload.setFixedSize(32, 24)
+        self.w_global_reload.setToolTip("Reload all projects.")
         w_hBoxLayout.addWidget(self.w_global_reload)
 
         # # [label] Global Settings
@@ -908,6 +907,7 @@ class MainWindow(qtw.QMainWindow):
         w_screensOff.setToolTip("Turn off the screens.")
         w_screensOff.setFixedWidth(40)
         w_screensOff.setFixedHeight(40)
+        w_screensOff.setEnabled(not utils.is_laptop_psutil())
         w_hBoxLayout.addWidget(w_screensOff)
 
         # Signals
@@ -1047,6 +1047,10 @@ class MainWindow(qtw.QMainWindow):
             w_project.set_filename(project.file)
             w_project.set_active(project.active)
             w_project.set_frames(project.get_frames())
+
+            x, y = project.get_final_resolution()
+            w_project.set_resolution(f'{x}x{y}')
+
             w_project.set_samples(project.get_samples())
             # w_project.set_camera(project.camera)
             w_project.set_render_filepath(project.get_render_filepath())

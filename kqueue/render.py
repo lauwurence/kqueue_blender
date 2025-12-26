@@ -57,6 +57,7 @@ import bpy
 scene = bpy.context.scene
 cycles = scene.cycles
 render = scene.render
+image_settings = render.image_settings
 shading = scene.display.shading
 
 # Scene
@@ -71,6 +72,26 @@ render.use_persistent_data = {project.get_use_persistent_data()}
 render.compositor_device = "GPU"
 render.compositor_precision = "FULL"
 """
+            # New data
+            for name, value in [
+                ('image_settings.file_format', project.get_file_format()),
+                ('render.resolution_x', project.get_resolution_x()),
+                ('render.resolution_y', project.get_resolution_y()),
+                ('render.resolution_percentage', project.get_resolution_percentage())
+            ]:
+
+                if value is None or value == "None":
+                    continue
+
+                if isinstance(value, str):
+
+                    if value.isnumeric():
+                        value = eval(value)
+
+                    else:
+                        value = f'"{value}"'
+
+                PYTHON += f'\n{name} = {value}'
 
             if preset.preview_render:
                 PYTHON += f"""
@@ -112,8 +133,12 @@ cycles.denoising_use_gpu = {project.get_denoising_use_gpu()}
 
             # Technically, take scene settings and assigning sRGB
             if preset.assign_srgb or True:
-                PYTHON += "\nrender.image_settings.color_management = 'FOLLOW_SCENE'"
+                PYTHON += "\nimage_settings.color_management = 'FOLLOW_SCENE'"
                 PYTHON += "\nscene.display_settings.display_device = 'sRGB'"
+
+            # This message is needed to let us know that all our settings
+            # were applied without errors.
+            PYTHON += '\n\nprint("All settings loaded successfully!")'
 
             with open(PYTOH_FILE, 'w', encoding="utf-8") as f:
                 f.write(PYTHON.strip())
@@ -265,6 +290,34 @@ class RenderListenThread(qtc.QThread):
     def __init__(self):
         super().__init__()
 
+        self.exit_message = None
+
+
+    def stop_rendering(self, reason, exit_message=None):
+        """
+        Stop rendering process.
+        """
+
+        preset = store.preset
+        log = main.log
+
+        if reason == 'NOT_LOADED_SETTINGS':
+            self.exit_message = 'Error during applying settings.'
+
+        elif reason == 'UNSAVED_FRAMES':
+            self.exit_message = 'Critical error, frames were not saved.'
+
+        else:
+            raise Exception(f'Bad reason: {reason}')
+
+        if exit_message is not None:
+            self.exit_message = exit_message
+
+        if self.exit_message:
+            log(self.exit_message)
+
+        preset.stop_render()
+
 
     def run(self):
         """
@@ -274,12 +327,25 @@ class RenderListenThread(qtc.QThread):
         mw = store.mw
         log = main.log
 
+        # What is the current project we're rendering.
+        current_project = None
+
+        # What is the current frame we're rendering.
+        current_frame = None
+
+        # After project change, we should know if our settings were applied
+        project_settings_flag = False
+
+        # What renders were unsaved due to lack of VRAM or other issues.
+        unsaved_renders_dict = {}
+
         while True:
 
             if preset.is_status('RENDERING_STOPPING', 'RENDERING_FINISHED'):
                 break
 
             try:
+
                 if not preset.process:
                     break
 
@@ -288,10 +354,25 @@ class RenderListenThread(qtc.QThread):
 
                     current_time = time.time()
 
+                    for unsaved_project, unsaved_frames in unsaved_renders_dict.items():
+
+                        if unsaved_project != current_project:
+                            continue
+
+                        clean_unsaved_frames = [ f for f in unsaved_frames if f != current_frame ]
+
+                        if not clean_unsaved_frames:
+                            continue
+
+                        msg = f'Critical Error: "{unsaved_project.file}" could not save frames: {clean_unsaved_frames}'
+                        self.stop_rendering('UNSAVED_FRAMES', exit_message=msg)
+
                     # Change project
                     found = search(r'(?:.*)--background ["](.*?.blend)["].*?-f ["](.*?)["]', line)
 
                     if found:
+                        project_settings_flag = True
+
                         file = found.group(1)
                         frames = found.group(2)
                         preset.last_frame_flag = None
@@ -301,18 +382,36 @@ class RenderListenThread(qtc.QThread):
                         for i in range(mw.w_listOfProjects.count()):
                             item = mw.w_listOfProjects.item(i)
                             w_project = mw.w_listOfProjects.itemWidget(item)
+                            project = w_project.project
 
-                            if file.strip() != w_project.project.file.strip():
+                            if file.strip() != project.file.strip():
                                 continue
 
+                            current_project = project
                             self.listOfProjects_setCurrentItem.emit(item)
 
+                        current_frame = None
+                        unsaved_renders_dict[project] = []
+
                         continue
+
+                    # Settings check
+                    if project_settings_flag:
+                        found = search(r'(?:.*)All settings loaded successfully!', line)
+
+                        if found:
+                            project_settings_flag = False
+                            continue
 
                     # Local progress <100% with Tiles
                     found = search(r'(?:.*)Rendered (\d+)/(\d+) Tiles, Sample (\d+)/(\d+)', line)
 
                     if found:
+
+                        if project_settings_flag:
+                            self.stop_rendering(reason='NOT_LOADED_SETTINGS')
+                            continue
+
                         tile = int(found.group(1))
                         tiles = int(found.group(2))
                         sample = int(found.group(3))
@@ -327,6 +426,11 @@ class RenderListenThread(qtc.QThread):
                     found = search(r'(?:.*)Sample (\d+)/(\d+)', line)
 
                     if found:
+
+                        if project_settings_flag:
+                            self.stop_rendering(reason='NOT_LOADED_SETTINGS')
+                            continue
+
                         sample = int(found.group(1))
                         samples = int(found.group(2))
                         progress = max(0.0, min(1.0, float(sample) / float(samples)))
@@ -339,6 +443,11 @@ class RenderListenThread(qtc.QThread):
                     found = search(r'(?:.*)Saved: [\'|\"](.*?)[\'|\"]', line)
 
                     if found:
+
+                        if project_settings_flag:
+                            self.stop_rendering(reason='NOT_LOADED_SETTINGS')
+                            continue
+
                         file = found.group(1)
                         preset.renders_list.append(file)
                         preset.render_avg_time.append(current_time - preset.render_start_time)
@@ -349,18 +458,30 @@ class RenderListenThread(qtc.QThread):
                         self.gProgress_setText.emit(f'{preset.global_frame}/{preset.global_frames}')
                         self.pProgress_setText.emit(f'{preset.project_frame}/{preset.project_frames}')
 
+                        while current_frame in unsaved_renders_dict[current_project]:
+                            unsaved_renders_dict[current_project].remove(current_frame)
+
+                        current_project = None
+                        current_frame = None
+
                         mw.update_widgets.emit()
 
                         continue
 
-                    # Progress
+                    # Progress...
                     found = search(r'(?:.*)Rendering single frame \(frame (\d+)\)', line)
 
                     if not found:
                         found = search(r'(?:.*)Rendering frame (\d+)', line)
 
                     if found:
-                        preset.frame_flag = int(found.group(1))
+
+                        if project_settings_flag:
+                            self.stop_rendering(reason='NOT_LOADED_SETTINGS')
+                            continue
+
+                        current_frame = int(found.group(1))
+                        preset.frame_flag = current_frame
 
                         if preset.frame_flag != preset.last_frame_flag:
                             preset.last_frame_flag = preset.frame_flag
@@ -374,6 +495,9 @@ class RenderListenThread(qtc.QThread):
                             self.pProgressBar_setValue.emit(round(pProgress * 100))
                             self.gProgress_setText.emit(f'{max(0, preset.global_frame - 1)}/{preset.global_frames}')
                             self.pProgress_setText.emit(f'{max(0, preset.project_frame - 1)}/{preset.project_frames}')
+
+                            if current_frame not in unsaved_renders_dict[current_project]:
+                                unsaved_renders_dict[current_project].append(current_frame)
 
                         continue
 
@@ -404,6 +528,9 @@ class RenderListenThread(qtc.QThread):
 
         else:
             log(f"Status: {preset.blender_status}")
+
+        if self.exit_message:
+            log(self.exit_message)
 
         preset.set_status('READY_TO_RENDER')
 

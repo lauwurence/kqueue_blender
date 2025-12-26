@@ -55,6 +55,10 @@ class QBlendProject(qtw.QWidget):
         self.w_frames = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_frames)
 
+        # [label] Resolution
+        self.w_resolution = qtw.QLabel()
+        self.w_hBoxLayout.addWidget(self.w_resolution)
+
         # [label] Samples
         self.w_samples = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_samples)
@@ -154,19 +158,22 @@ class QBlendProject(qtw.QWidget):
         self.w_active.setChecked(value)
 
     def set_frames(self, frames):
-        self.w_frames.setText(f'| Frames: [{frames}]')
+        self.w_frames.setText(f'| Fra: [{frames}]')
 
         if self.project.frames_overrode():
             self.w_frames.setStyleSheet("font-weight: bold;")
 
     def set_samples(self, samples):
-        self.w_samples.setText(f'| Samples: {samples}')
+        self.w_samples.setText(f'| Sam: {samples}')
+
+    def set_resolution(self, resolution):
+        self.w_resolution.setText(f'| Res: {resolution}')
 
     # def set_camera(self, camera):
     #     self.w_camera.setText(f'| Camera: "{camera}"')
 
     def set_render_filepath(self, filepath):
-        self.w_render_filepath.setText(f'| Output: "{filepath}"')
+        self.w_render_filepath.setText(f'| Out: "{filepath}"')
 
 
 ################################################################################
@@ -189,6 +196,7 @@ class QBlendProjectSettings(qtw.QWidget):
         self.setMinimumWidth(450)
         self.setFixedHeight(400)
         self.setWindowModality(Qt.ApplicationModal)
+        self.resize(450, 400)
 
         # [vbox]
         layout = qtw.QVBoxLayout()
@@ -197,6 +205,43 @@ class QBlendProjectSettings(qtw.QWidget):
         # [form] Preset Override
         l_form = qtw.QFormLayout()
         layout.addLayout(l_form)
+
+
+        # [hbox] Resolution
+        w_hBoxLayoutResolution = qtw.QHBoxLayout()
+        l_form.addRow("Resolution", w_hBoxLayoutResolution)
+
+        if True:
+
+            # [edit] Resolution X
+            self.w_resX = qtw.QLineEdit(str(project.get_resolution_x()))
+            self.w_resX.setPlaceholderText(str(project.resolution_x))
+            self.w_resX.setValidator(qtg.QIntValidator(1, 32 * 1024, self))
+            w_hBoxLayoutResolution.addWidget(self.w_resX)
+
+            # [edit] Resolution Y
+            self.w_resY = qtw.QLineEdit(str(project.get_resolution_y()))
+            self.w_resY.setPlaceholderText(str(project.resolution_y))
+            self.w_resY.setValidator(qtg.QIntValidator(1, 32 * 1024, self))
+            w_hBoxLayoutResolution.addWidget(self.w_resY)
+
+            # [edit] Resolution Percentage
+            self.w_resPerc = qtw.QLineEdit(str(project.get_resolution_percentage()))
+            self.w_resPerc.setPlaceholderText(str(project.resolution_percentage))
+            self.w_resPerc.setValidator(qtg.QIntValidator(1, 999999, self))
+            w_hBoxLayoutResolution.addWidget(self.w_resPerc)
+
+            # [button] Resolution Reset
+            def reset_resolution():
+                self.w_resX.setText(str(project.resolution_x))
+                self.w_resY.setText(str(project.resolution_y))
+                self.w_resPerc.setText(str(project.resolution_percentage))
+
+            w_resReset = QPushButton("", clicked=reset_resolution)
+            w_resReset.setIcon(qtg.QIcon('kqueue/icons/reload_project.svg'))
+            w_resReset.setFixedWidth(30)
+            w_resReset.setIconSize(qtc.QSize(18, 18))
+            w_hBoxLayoutResolution.addWidget(w_resReset)
 
 
         # [hbox] Frames
@@ -218,17 +263,23 @@ class QBlendProjectSettings(qtw.QWidget):
             w_hBoxLayoutFrames.addWidget(w_framesReset)
 
 
-        # # [label] Frames Result
-        # self.w_result = w_result = qtw.QLabel("")
-        # self.w_result.setFont(font)
-        # l_form.addRow("", w_result)
+        # [label] Frames Result
+        self.w_result = qtw.QLabel("")
+        self.w_result.setEnabled(False)
+        self.w_result.setStyleSheet("font-size: 8px;")
+        l_form.addRow("", self.w_result)
 
-        # self.wResult_setText.connect(w_result.setText)
-        # self.w_frames.textChanged.connect(self.wResult_setText.emit)
-        # .w_result.setText(f'{self.project.get_frames_list()}')
+        self.wResult_setText.connect(self.w_result.setText)
 
-        # w_frames.
-        # w_result.setText("!")
+        def update_result():
+            try:
+                tt = project.get_frames_list_string(frames=self.w_frames.text())
+            except:
+                tt = "!"
+
+            self.wResult_setText.emit(tt)
+
+        self.w_frames.textChanged.connect(update_result)
 
 
         # [edit] Samples
@@ -345,6 +396,7 @@ class QBlendProjectSettings(qtw.QWidget):
 
 
         self.update_frames_result()
+        update_result()
 
 
     def keyPressEvent(self, event):
@@ -380,6 +432,8 @@ class QBlendProjectSettings(qtw.QWidget):
         Save values and set need save if something changed.
         """
 
+        need_save = False
+
         def set_value(name, new_value):
             new_value = new_value or None
             old_value = getattr(self.project, name)
@@ -389,8 +443,13 @@ class QBlendProjectSettings(qtw.QWidget):
 
             print(name, old_value, "=>", new_value)
             setattr(self.project, name, new_value)
-            store.preset.set_need_save()
 
+            nonlocal need_save
+            need_save = True
+
+        set_value('resolution_x_override', self.w_resX.text())
+        set_value('resolution_y_override', self.w_resY.text())
+        set_value('resolution_percentage_override', self.w_resPerc.text())
         set_value('frames_override', self.w_frames.text())
         set_value('samples_override', self.w_samples.text())
         set_value('render_filepath_override', self.w_renderFilepath.text())
@@ -402,3 +461,7 @@ class QBlendProjectSettings(qtw.QWidget):
         set_value('denoising_use_gpu_override', eval(self.w_denoiserUseGPU.text()))
         set_value('denoising_input_passes', self.w_denoiserInputPasses.currentText())
         set_value('denoising_prefilter', self.w_denoiserPrefilter.currentText())
+
+        if need_save:
+            store.preset.set_need_save()
+            print("New settings applied.")
