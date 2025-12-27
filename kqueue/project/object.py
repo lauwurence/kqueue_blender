@@ -75,7 +75,7 @@ class BlendProject():
     def is_renderable(self):
         """ """
 
-        return self.active and self.file_exists() and self.render_filepath_exists()
+        return self.active and self.get_camera() and self.file_exists() and self.render_filepath_exists()
 
 
     def file_exists(self):

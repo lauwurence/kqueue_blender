@@ -1086,7 +1086,7 @@ class MainWindow(qtw.QMainWindow):
             w_project.set_resolution(f'{x}x{y}')
 
             w_project.set_samples(project.get_samples())
-            # w_project.set_camera(project.camera)
+            w_project.set_camera(project.get_camera())
             w_project.set_render_filepath(project.get_render_filepath())
             w_project.update_widgets()
 
@@ -1142,6 +1142,7 @@ class MainWindow(qtw.QMainWindow):
         if preset.is_status('RENDERING') or preset.is_status('RENDERING_STOPPING'):
             self.projectSave.setEnabled(False)
             self.projectLoad.setEnabled(False)
+            self.projectReload.setEnabled(False)
             self.w_locateBlender.setEnabled(False)
             self.w_selective.setEnabled(False)
             # self.w_assign_srgb.setEnabled(False)
@@ -1158,6 +1159,7 @@ class MainWindow(qtw.QMainWindow):
         else:
             self.projectSave.setEnabled(True)
             self.projectLoad.setEnabled(True)
+            self.projectReload.setEnabled(True)
             self.w_locateBlender.setEnabled(True)
             self.w_selective.setEnabled(True)
             # self.w_assign_srgb.setEnabled(True)

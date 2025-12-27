@@ -90,8 +90,10 @@ class QBlendProject(qtw.QWidget):
         add_separator()
 
         # [label] Camera
-        # self.w_camera = qtw.QLabel()
-        # self.w_hBoxLayout.addWidget(self.w_camera)
+        self.w_camera = qtw.QLabel()
+        self.w_hBoxLayout.addWidget(self.w_camera)
+
+        add_separator()
 
         # [label] Output
         self.w_render_filepath = qtw.QLabel()
@@ -216,8 +218,13 @@ class QBlendProject(qtw.QWidget):
     def set_resolution(self, resolution):
         self.w_resolution.setText(f'Res: {resolution}')
 
-    # def set_camera(self, camera):
-    #     self.w_camera.setText(f'Camera: "{camera}"')
+    def set_camera(self, camera):
+
+        if camera:
+            self.w_camera.setText(f'Cam: "{camera}"')
+        else:
+            self.w_camera.setText(f'No Camera!')
+            self.w_camera.setStyleSheet("color: red;")
 
     def set_render_filepath(self, filepath):
         self.w_render_filepath.setText(f'Out: "{filepath}"')
