@@ -24,5 +24,6 @@ def is_laptop_psutil():
                 return True
 
         return False
+
     except:
         return False
