@@ -7,6 +7,7 @@ import PyQt5.QtCore as qtc
 from PyQt5.QtCore import Qt
 
 from ..widgets.QPushButton import QPushButton
+from ..widgets.QComboBox import QComboBox
 from ..utils.pathutils import join
 from ..config import *
 from .. import store
@@ -29,6 +30,23 @@ class QBlendProject(qtw.QWidget):
         self.w_hBoxLayout = qtw.QHBoxLayout()
         self.setLayout(self.w_hBoxLayout)
 
+        def add_separator():
+
+            # [frame} Separator
+            separator = qtw.QFrame()
+            separator.setFrameShape(qtw.QFrame.VLine)
+            separator.setFrameShadow(qtw.QFrame.Plain)
+            separator.setStyleSheet("""
+                QFrame {
+                    background-color: #4a4a4a;
+                    color: #4a4a4a;
+                    margin: 2px;
+                }
+            """)
+
+            self.w_hBoxLayout.addWidget(separator)
+
+
         # [check] Active
         self.w_active = qtw.QCheckBox()
         self.w_hBoxLayout.addWidget(self.w_active)
@@ -42,8 +60,8 @@ class QBlendProject(qtw.QWidget):
         self.w_active.clicked.connect(lambda: toggle_active())
         self.w_active.setStyleSheet("""
             QCheckBox::indicator {
-                width : 12;
-                height : 12;
+                width: 12;
+                height: 12;
             }
         """)
 
@@ -51,17 +69,25 @@ class QBlendProject(qtw.QWidget):
         self.w_filename = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_filename)
 
+        add_separator()
+
         # [label] Frames
         self.w_frames = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_frames)
+
+        add_separator()
 
         # [label] Resolution
         self.w_resolution = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_resolution)
 
+        add_separator()
+
         # [label] Samples
         self.w_samples = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_samples)
+
+        add_separator()
 
         # [label] Camera
         # self.w_camera = qtw.QLabel()
@@ -72,7 +98,7 @@ class QBlendProject(qtw.QWidget):
         self.w_hBoxLayout.addWidget(self.w_render_filepath)
 
         # [label] Open Render Output Image
-        self.w_open_render_image = QPushButton("", clicked=lambda: self.project.open_render_output_image())
+        self.w_open_render_image = QPushButton("", clicked=project.open_render_output_image)
         self.w_open_render_image.setIcon(qtg.QIcon('kqueue/icons/open_render.svg'))
         self.w_open_render_image.setToolTip("Open the last render.")
         self.w_open_render_image.setIconSize(qtc.QSize(14, 14))
@@ -81,7 +107,7 @@ class QBlendProject(qtw.QWidget):
         self.w_hBoxLayout.addWidget(self.w_open_render_image)
 
         # [label] Open Render Output Folder
-        self.w_open_render_folder = QPushButton("", clicked=lambda: self.project.open_render_output_folder())
+        self.w_open_render_folder = QPushButton("", clicked=project.open_render_output_folder)
         self.w_open_render_folder.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
         self.w_open_render_folder.setToolTip("Open render folder.")
         self.w_open_render_folder.setIconSize(qtc.QSize(14, 14))
@@ -98,6 +124,11 @@ class QBlendProject(qtw.QWidget):
 
         self.initialized = True
 
+        self.UPDATE_LIST = [
+            (project, 'file_exists'),
+            (project, 'is_outdated'),
+        ]
+
         self.update_widgets()
 
 
@@ -106,6 +137,21 @@ class QBlendProject(qtw.QWidget):
         """
 
         if not self.initialized:
+            return
+
+        update = False
+
+        for obj, name in self.UPDATE_LIST:
+            new_value = getattr(obj, name)()
+            old_value = getattr(self, f'__{name}', None)
+
+            if old_value == new_value:
+                continue
+
+            setattr(self, f'__{name}', new_value)
+            update = True
+
+        if not update:
             return
 
         if self.w_open:
@@ -146,6 +192,7 @@ class QBlendProject(qtw.QWidget):
         self.w_open_render_image.setEnabled(bool(self.project.get_render_output_image()))
         self.w_open_render_folder.setEnabled(bool(self.project.get_render_output_folder()))
 
+
     def set_filename(self, filename):
         path = Path(filename)
         self.w_filename.setText(f'".../{path.name}"')
@@ -158,22 +205,25 @@ class QBlendProject(qtw.QWidget):
         self.w_active.setChecked(value)
 
     def set_frames(self, frames):
-        self.w_frames.setText(f'| Fra: [{frames}]')
+        self.w_frames.setText(f'Fra: [{frames}]')
 
         if self.project.frames_overrode():
             self.w_frames.setStyleSheet("font-weight: bold;")
 
     def set_samples(self, samples):
-        self.w_samples.setText(f'| Sam: {samples}')
+        self.w_samples.setText(f'Sam: {samples}')
 
     def set_resolution(self, resolution):
-        self.w_resolution.setText(f'| Res: {resolution}')
+        self.w_resolution.setText(f'Res: {resolution}')
 
     # def set_camera(self, camera):
-    #     self.w_camera.setText(f'| Camera: "{camera}"')
+    #     self.w_camera.setText(f'Camera: "{camera}"')
 
     def set_render_filepath(self, filepath):
-        self.w_render_filepath.setText(f'| Out: "{filepath}"')
+        self.w_render_filepath.setText(f'Out: "{filepath}"')
+
+        if not self.project.render_filepath_exists():
+            self.w_render_filepath.setStyleSheet("color: red;")
 
 
 ################################################################################
@@ -187,16 +237,19 @@ class QBlendProjectSettings(qtw.QWidget):
 
         self.project = project
 
-        from ..main import set_window_titlebar_dark
-        set_window_titlebar_dark(self)
+        # Config
+        FIELD_HEIGHT = 22
 
         # Window
         self.setWindowTitle(str(self.project.file))
         self.setWindowIcon(qtg.QIcon(ICON))
         self.setMinimumWidth(450)
-        self.setFixedHeight(400)
+        self.setFixedHeight(425)
         self.setWindowModality(Qt.ApplicationModal)
         self.resize(450, 400)
+
+        from ..main import set_window_titlebar_dark
+        set_window_titlebar_dark(self)
 
         # [vbox]
         layout = qtw.QVBoxLayout()
@@ -207,192 +260,217 @@ class QBlendProjectSettings(qtw.QWidget):
         layout.addLayout(l_form)
 
 
-        # [hbox] Resolution
-        w_hBoxLayoutResolution = qtw.QHBoxLayout()
-        l_form.addRow("Resolution", w_hBoxLayoutResolution)
-
-        if True:
-
-            # [edit] Resolution X
-            self.w_resX = qtw.QLineEdit(str(project.get_resolution_x()))
-            self.w_resX.setPlaceholderText(str(project.resolution_x))
-            self.w_resX.setValidator(qtg.QIntValidator(1, 32 * 1024, self))
-            w_hBoxLayoutResolution.addWidget(self.w_resX)
-
-            # [edit] Resolution Y
-            self.w_resY = qtw.QLineEdit(str(project.get_resolution_y()))
-            self.w_resY.setPlaceholderText(str(project.resolution_y))
-            self.w_resY.setValidator(qtg.QIntValidator(1, 32 * 1024, self))
-            w_hBoxLayoutResolution.addWidget(self.w_resY)
-
-            # [edit] Resolution Percentage
-            self.w_resPerc = qtw.QLineEdit(str(project.get_resolution_percentage()))
-            self.w_resPerc.setPlaceholderText(str(project.resolution_percentage))
-            self.w_resPerc.setValidator(qtg.QIntValidator(1, 999999, self))
-            w_hBoxLayoutResolution.addWidget(self.w_resPerc)
-
-            # [button] Resolution Reset
-            def reset_resolution():
-                self.w_resX.setText(str(project.resolution_x))
-                self.w_resY.setText(str(project.resolution_y))
-                self.w_resPerc.setText(str(project.resolution_percentage))
-
-            w_resReset = QPushButton("", clicked=reset_resolution)
-            w_resReset.setIcon(qtg.QIcon('kqueue/icons/reload_project.svg'))
-            w_resReset.setFixedWidth(30)
-            w_resReset.setIconSize(qtc.QSize(18, 18))
-            w_hBoxLayoutResolution.addWidget(w_resReset)
-
-
         # [hbox] Frames
-        w_hBoxLayoutFrames = qtw.QHBoxLayout()
-        l_form.addRow("Frames", w_hBoxLayoutFrames)
+        hbox = qtw.QHBoxLayout()
+        l_form.addRow("Frames", hbox)
 
         if True:
 
             # [edit] Frames
-            self.w_frames = w_frames = qtw.QLineEdit(str(project.get_frames()))
-            w_frames.setPlaceholderText(str(project.frames))
-            w_hBoxLayoutFrames.addWidget(w_frames)
+            self.frames = qtw.QLineEdit(str(project.get_frames()))
+            self.frames.setFixedHeight(FIELD_HEIGHT)
+            self.frames.setPlaceholderText(str(project.frames))
+            hbox.addWidget(self.frames)
 
             # [button] Frames Reset
-            w_framesReset = QPushButton("", clicked=lambda: self.w_frames.setText(str(project.get_frames())))
-            w_framesReset.setIcon(qtg.QIcon('kqueue/icons/reload_project.svg'))
-            w_framesReset.setFixedWidth(30)
-            w_framesReset.setIconSize(qtc.QSize(18, 18))
-            w_hBoxLayoutFrames.addWidget(w_framesReset)
+            self.framesReset = QPushButton("", clicked=lambda: self.frames.setText(str(project.get_frames())))
+            self.framesReset.setFixedHeight(FIELD_HEIGHT)
+            self.framesReset.setFixedWidth(30)
+            self.framesReset.setIcon(qtg.QIcon('kqueue/icons/reset.svg'))
+            self.framesReset.setIconSize(qtc.QSize(18, 18))
+            hbox.addWidget(self.framesReset)
 
 
         # [label] Frames Result
-        self.w_result = qtw.QLabel("")
-        self.w_result.setEnabled(False)
-        self.w_result.setStyleSheet("font-size: 8px;")
-        l_form.addRow("", self.w_result)
-
-        self.wResult_setText.connect(self.w_result.setText)
+        self.result = qtw.QLabel("")
+        self.result.setEnabled(False)
+        self.result.setFixedHeight(FIELD_HEIGHT)
+        self.result.setStyleSheet("font-size: 8px;")
+        l_form.addRow("", self.result)
 
         def update_result():
             try:
-                tt = project.get_frames_list_string(frames=self.w_frames.text())
+                tt = project.get_frames_list_string(frames=self.frames.text())
             except:
                 tt = "!"
 
             self.wResult_setText.emit(tt)
 
-        self.w_frames.textChanged.connect(update_result)
+        self.wResult_setText.connect(self.result.setText)
+        self.frames.textChanged.connect(update_result)
+
+
+        # [hbox] Resolution
+        hbox = qtw.QHBoxLayout()
+        l_form.addRow("Resolution", hbox)
+
+        if True:
+
+            # [edit] Resolution X
+            self.resX = qtw.QLineEdit(str(project.get_resolution_x()))
+            self.resX.setFixedHeight(FIELD_HEIGHT)
+            self.resX.setPlaceholderText(str(project.resolution_x))
+            self.resX.setValidator(qtg.QIntValidator(1, 32 * 1024, self))
+            hbox.addWidget(self.resX)
+
+            # [edit] Resolution Y
+            self.resY = qtw.QLineEdit(str(project.get_resolution_y()))
+            self.resY.setFixedHeight(FIELD_HEIGHT)
+            self.resY.setPlaceholderText(str(project.resolution_y))
+            self.resY.setValidator(qtg.QIntValidator(1, 32 * 1024, self))
+            hbox.addWidget(self.resY)
+
+            # [edit] Resolution Percentage
+            self.resPerc = qtw.QLineEdit(str(project.get_resolution_percentage()))
+            self.resPerc.setFixedHeight(FIELD_HEIGHT)
+            self.resPerc.setPlaceholderText(str(project.resolution_percentage))
+            self.resPerc.setValidator(qtg.QIntValidator(1, 999999, self))
+            hbox.addWidget(self.resPerc)
+
+            # [button] Resolution Reset
+            def reset_resolution():
+                self.resX.setText(str(project.resolution_x))
+                self.resY.setText(str(project.resolution_y))
+                self.resPerc.setText(str(project.resolution_percentage))
+
+            self.resReset = QPushButton("", clicked=reset_resolution)
+            self.resReset.setIcon(qtg.QIcon('kqueue/icons/reset.svg'))
+            self.resReset.setFixedWidth(30)
+            self.resReset.setFixedHeight(FIELD_HEIGHT)
+            self.resReset.setIconSize(qtc.QSize(18, 18))
+            hbox.addWidget(self.resReset)
 
 
         # [edit] Samples
-        self.w_samples = w_samples = qtw.QLineEdit(str(project.get_samples()))
-        w_samples.setPlaceholderText(str(project.samples))
-        w_samples.setValidator(qtg.QIntValidator(1, 99999, self))
-        l_form.addRow("Samples", w_samples)
+        self.samples = qtw.QLineEdit(str(project.get_samples()))
+        self.samples.setFixedHeight(FIELD_HEIGHT)
+        self.samples.setPlaceholderText(str(project.samples))
+        self.samples.setValidator(qtg.QIntValidator(1, 99999, self))
+        l_form.addRow("Samples", self.samples)
 
 
         # [hbox] Render Filepath
-        w_hBoxLayoutRenderFilepath = qtw.QHBoxLayout()
-        l_form.addRow("Render Filepath", w_hBoxLayoutRenderFilepath)
+        hbox = qtw.QHBoxLayout()
+        l_form.addRow("Render Filepath", hbox)
 
         if True:
 
             # [edit] Render Filepath
-            self.w_renderFilepath = w_renderFilepath = qtw.QLineEdit(str(project.get_render_filepath()))
-            w_renderFilepath.setPlaceholderText(str(project.render_filepath))
-            w_hBoxLayoutRenderFilepath.addWidget(w_renderFilepath)
+            self.renderFilepath = qtw.QLineEdit(str(project.get_render_filepath()))
+            self.renderFilepath.setFixedHeight(FIELD_HEIGHT)
+            self.renderFilepath.setPlaceholderText(str(project.render_filepath))
+            hbox.addWidget(self.renderFilepath)
 
             # [button] Render Filepath
             def locate_filepath():
-                filepath, _ = qtw.QFileDialog.getSaveFileName(self, 'Set Render Filepath', w_renderFilepath.text())
-                if not filepath: return
-                w_renderFilepath.setText(join(filepath))
-            w_locateFilepath = QPushButton("", clicked=locate_filepath)
-            w_locateFilepath.clicked.connect(lambda: store.mw.update_widgets.emit())
-            w_locateFilepath.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
-            w_locateFilepath.setFixedWidth(30)
-            w_locateFilepath.setIconSize(qtc.QSize(18, 18))
-            w_hBoxLayoutRenderFilepath.addWidget(w_locateFilepath)
+                filepath, _ = qtw.QFileDialog.getSaveFileName(self, 'Set Render Filepath', self.renderFilepath.text())
+
+                if not filepath:
+                    return
+
+                self.renderFilepath.setText(join(filepath))
+
+            self.locateFilepath = QPushButton("", clicked=locate_filepath)
+            self.locateFilepath.setFixedWidth(30)
+            self.locateFilepath.setFixedHeight(FIELD_HEIGHT)
+            self.locateFilepath.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
+            self.locateFilepath.setIconSize(qtc.QSize(18, 18))
+            self.locateFilepath.clicked.connect(lambda: store.mw.update_widgets.emit())
+            hbox.addWidget(self.locateFilepath)
 
 
         # [edit] File Format
-        self.w_fileFormat = w_fileFormat = qtw.QComboBox()
-        w_fileFormat.addItems(['PNG', 'JPEG', 'JPEG2000', 'WEBP', 'TIFF'])
-        w_fileFormat.setCurrentText(str(project.get_file_format()))
-        l_form.addRow("File Format", w_fileFormat)
+        self.fileFormat = QComboBox()
+        self.fileFormat.setFixedHeight(FIELD_HEIGHT)
+        self.fileFormat.addItems(['PNG', 'JPEG', 'JPEG2000', 'WEBP', 'TIFF'])
+        self.fileFormat.setCurrentText(str(project.get_file_format()))
+        l_form.addRow("File Format", self.fileFormat)
 
 
         # [edit] Camera
-        self.w_camera = w_camera = qtw.QComboBox()
-        w_camera.addItems(project.camera_list)
-        w_camera.setCurrentText(str(project.get_camera()))
-        l_form.addRow("Camera", w_camera)
+        self.camera = QComboBox()
+        self.camera.addItems(project.camera_list)
+        self.camera.setCurrentText(str(project.get_camera()))
+        self.camera.setFixedHeight(FIELD_HEIGHT)
+        l_form.addRow("Camera", self.camera)
 
 
         # [edit] Scene
-        self.w_scene = w_scene = qtw.QComboBox()
-        w_scene.addItems(project.scene_list)
-        w_scene.setCurrentText(str(project.get_scene()))
-        l_form.addRow("Scene", w_scene)
+        self.scene = QComboBox()
+        self.scene.setFixedHeight(FIELD_HEIGHT)
+        self.scene.addItems(project.scene_list)
+        self.scene.setCurrentText(str(project.get_scene()))
+        l_form.addRow("Scene", self.scene)
 
 
         # [edit] Persistent
-        self.w_usePersistentData = w_usePersistentData = QPushButton(str(project.get_use_persistent_data()))
-        w_usePersistentData.setCheckable(True)
-        w_usePersistentData.setChecked(project.get_use_persistent_data())
-        w_usePersistentData.clicked.connect(lambda: w_usePersistentData.setText(str(w_usePersistentData.isChecked())))
-        l_form.addRow("Persistent Data", w_usePersistentData)
+        self.usePersistentData = QPushButton(str(project.get_use_persistent_data()))
+        self.usePersistentData.setFixedHeight(FIELD_HEIGHT)
+        self.usePersistentData.setCheckable(True)
+        self.usePersistentData.setChecked(project.get_use_persistent_data())
+        self.usePersistentData.clicked.connect(lambda: self.usePersistentData.setText(str(self.usePersistentData.isChecked())))
+        l_form.addRow("Persistent Data", self.usePersistentData)
 
 
         # [edit] Adaptive Sampling
-        self.w_useAdaptiveSampling = w_useAdaptiveSampling = QPushButton(str(project.get_use_adaptive_sampling()))
-        w_useAdaptiveSampling.setCheckable(True)
-        w_useAdaptiveSampling.setChecked(project.get_use_adaptive_sampling())
-        w_useAdaptiveSampling.clicked.connect(lambda: w_useAdaptiveSampling.setText(str(w_useAdaptiveSampling.isChecked())))
-        l_form.addRow("Adaptive Sampling", w_useAdaptiveSampling)
+        self.useAdaptiveSampling = QPushButton(str(project.get_use_adaptive_sampling()))
+        self.useAdaptiveSampling.setFixedHeight(FIELD_HEIGHT)
+        self.useAdaptiveSampling.setCheckable(True)
+        self.useAdaptiveSampling.setChecked(project.get_use_adaptive_sampling())
+        self.useAdaptiveSampling.clicked.connect(lambda: self.useAdaptiveSampling.setText(str(self.useAdaptiveSampling.isChecked())))
+        l_form.addRow("Adaptive Sampling", self.useAdaptiveSampling)
 
 
         # [edit] Denoiser
-        self.w_denoiser = w_denoiser = qtw.QComboBox()
-        w_denoiser.addItems(['NONE', 'OPTIX', 'OPENIMAGEDENOISE'])
-        w_denoiser.setCurrentText(str(project.get_denoiser()))
-        l_form.addRow("Denoiser", w_denoiser)
+        self.denoiser = QComboBox()
+        self.denoiser.setFixedHeight(FIELD_HEIGHT)
+        self.denoiser.addItems(['NONE', 'OPTIX', 'OPENIMAGEDENOISE'])
+        self.denoiser.setCurrentText(str(project.get_denoiser()))
+        l_form.addRow("Denoiser", self.denoiser)
 
         # [button] Denoiser Use GPU
-        self.w_denoiserUseGPU = w_denoiserUseGPU = QPushButton(str(project.get_denoising_use_gpu()))
-        w_denoiserUseGPU.setCheckable(True)
-        w_denoiserUseGPU.setChecked(project.get_denoising_use_gpu())
-        w_denoiserUseGPU.clicked.connect(lambda: w_denoiserUseGPU.setText(str(w_denoiserUseGPU.isChecked())))
-        l_form.addRow("Use GPU", w_denoiserUseGPU)
+        self.denoiserUseGPU = QPushButton(str(project.get_denoising_use_gpu()))
+        self.denoiserUseGPU.setFixedHeight(FIELD_HEIGHT)
+        self.denoiserUseGPU.setCheckable(True)
+        self.denoiserUseGPU.setChecked(project.get_denoising_use_gpu())
+        self.denoiserUseGPU.clicked.connect(lambda: self.denoiserUseGPU.setText(str(self.denoiserUseGPU.isChecked())))
+        l_form.addRow("Use GPU", self.denoiserUseGPU)
 
         # [edit] Denoiser Input Passes
-        self.w_denoiserInputPasses = w_denoiserInputPasses = qtw.QComboBox()
-        w_denoiserInputPasses.addItems(['RGB', 'RGB_ALBEDO', 'RGB_ALBEDO_NORMAL'])
-        w_denoiserInputPasses.setCurrentText(str(project.get_denoising_input_passes()))
-        l_form.addRow("Input Passes", w_denoiserInputPasses)
+        self.denoiserInputPasses = QComboBox()
+        self.denoiserInputPasses.addItems(['RGB', 'RGB_ALBEDO', 'RGB_ALBEDO_NORMAL'])
+        self.denoiserInputPasses.setCurrentText(str(project.get_denoising_input_passes()))
+        self.denoiserInputPasses.setFixedHeight(FIELD_HEIGHT)
+        l_form.addRow("Input Passes", self.denoiserInputPasses)
 
         # [edit] Denoiser Use GPU
-        self.w_denoiserPrefilter = w_denoiserPrefilter = qtw.QComboBox()
-        w_denoiserPrefilter.addItems(['NONE', 'FAST', 'ACCURATE'])
-        w_denoiserPrefilter.setCurrentText(str(project.get_denoising_prefilter()))
-        l_form.addRow("Prefilter", w_denoiserPrefilter)
+        self.denoiserPrefilter = QComboBox()
+        self.denoiserPrefilter.addItems(['NONE', 'FAST', 'ACCURATE'])
+        self.denoiserPrefilter.setCurrentText(str(project.get_denoising_prefilter()))
+        self.denoiserPrefilter.setFixedHeight(FIELD_HEIGHT)
+        l_form.addRow("Prefilter", self.denoiserPrefilter)
+
+
+        layout.addSpacing(10)
 
 
         # [hbox] Save & Cancel
-        w_hBoxLayout = qtw.QHBoxLayout()
-        layout.addLayout(w_hBoxLayout)
+        hbox = qtw.QHBoxLayout()
+        layout.addLayout(hbox)
 
         if True:
 
             # [button] Save
-            w_save = QPushButton("Save", clicked=lambda: self.save_and_close())
-            w_save.setFixedWidth(100)
-            w_save.setFixedHeight(30)
-            w_hBoxLayout.addWidget(w_save, 0, Qt.AlignRight)
+            save = QPushButton("Save", clicked=lambda: self.save_and_close())
+            save.setFixedWidth(100)
+            save.setFixedHeight(30)
+            hbox.addWidget(save, 0, Qt.AlignRight)
 
             # [button] Cancel
-            w_cancel = QPushButton("Cancel", clicked=lambda: self.close())
-            w_cancel.setFixedWidth(100)
-            w_cancel.setFixedHeight(30)
-            w_hBoxLayout.addWidget(w_cancel)
+            cancel = QPushButton("Cancel", clicked=lambda: self.close())
+            cancel.setFixedWidth(100)
+            cancel.setFixedHeight(30)
+            hbox.addWidget(cancel)
 
 
         self.update_frames_result()
@@ -414,7 +492,7 @@ class QBlendProjectSettings(qtw.QWidget):
 
         self.wResult_setText.emit(f'{self.project.get_frames_list()}')
         # print(f'{self.project.get_frames_list()}')
-        # self.w_result.setText(f'{self.project.get_frames_list()}')
+        # self.result.setText(f'{self.project.get_frames_list()}')
 
 
     def save_and_close(self):
@@ -422,12 +500,12 @@ class QBlendProjectSettings(qtw.QWidget):
         Save values and close this window.
         """
 
-        self.save()
+        self.__save()
         self.close()
         store.mw.update_list.emit(False)
 
 
-    def save(self):
+    def __save(self):
         """
         Save values and set need save if something changed.
         """
@@ -447,20 +525,20 @@ class QBlendProjectSettings(qtw.QWidget):
             nonlocal need_save
             need_save = True
 
-        set_value('resolution_x_override', self.w_resX.text())
-        set_value('resolution_y_override', self.w_resY.text())
-        set_value('resolution_percentage_override', self.w_resPerc.text())
-        set_value('frames_override', self.w_frames.text())
-        set_value('samples_override', self.w_samples.text())
-        set_value('render_filepath_override', self.w_renderFilepath.text())
-        set_value('camera_override', self.w_camera.currentText())
-        set_value('scene_override', self.w_scene.currentText())
-        set_value('use_persistent_data_override', eval(self.w_usePersistentData.text()))
-        set_value('use_adaptive_sampling_override', eval(self.w_useAdaptiveSampling.text()))
-        set_value('denoiser_override', self.w_denoiser.currentText())
-        set_value('denoising_use_gpu_override', eval(self.w_denoiserUseGPU.text()))
-        set_value('denoising_input_passes', self.w_denoiserInputPasses.currentText())
-        set_value('denoising_prefilter', self.w_denoiserPrefilter.currentText())
+        set_value('resolution_x_override', self.resX.text())
+        set_value('resolution_y_override', self.resY.text())
+        set_value('resolution_percentage_override', self.resPerc.text())
+        set_value('frames_override', self.frames.text())
+        set_value('samples_override', self.samples.text())
+        set_value('render_filepath_override', self.renderFilepath.text())
+        set_value('camera_override', self.camera.currentText())
+        set_value('scene_override', self.scene.currentText())
+        set_value('use_persistent_data_override', eval(self.usePersistentData.text()))
+        set_value('use_adaptive_sampling_override', eval(self.useAdaptiveSampling.text()))
+        set_value('denoiser_override', self.denoiser.currentText())
+        set_value('denoising_use_gpu_override', eval(self.denoiserUseGPU.text()))
+        set_value('denoising_input_passes', self.denoiserInputPasses.currentText())
+        set_value('denoising_prefilter', self.denoiserPrefilter.currentText())
 
         if need_save:
             store.preset.set_need_save()

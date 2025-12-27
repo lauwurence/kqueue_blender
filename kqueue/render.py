@@ -36,7 +36,7 @@ class RenderThread(qtc.QThread):
 
         for project in preset.project_list:
 
-            if not project.active:
+            if not project.is_renderable():
                 continue
 
             if preset.is_status('RENDERING_STOPPING', 'RENDERING_FINISHED'):
@@ -187,7 +187,7 @@ blender --background "{project.file}" --scene "{sc}" -E "{'CYCLES' if not preset
                 self.listen_thread.pProgressBar_setValue.connect(mw.w_pProgressBar.setValue)
                 self.listen_thread.pProgress_setText.connect(mw.w_pProgress.setText)
 
-                self.listen_thread.rProgressBar_setValue.connect(mw.w_rProgressBar.setValue)
+                self.listen_thread.rProgressBar_setValue.connect(mw.w_rProgressBar.setValueAnimated)
                 # self.listen_thread.gProgressETA_setText.connect(mw.w_gProgressETA.setText)
 
                 self.timer_thread.gProgressETA_setText.connect(mw.w_gProgressETA.setText)
@@ -337,7 +337,9 @@ class RenderListenThread(qtc.QThread):
         project_settings_flag = False
 
         # What renders were unsaved due to lack of VRAM or other issues.
-        unsaved_renders_dict = {}
+        current_render = []
+        saved_renders = []
+        unsaved_renders = []
 
         while True:
 
@@ -354,18 +356,8 @@ class RenderListenThread(qtc.QThread):
 
                     current_time = time.time()
 
-                    for unsaved_project, unsaved_frames in unsaved_renders_dict.items():
-
-                        if unsaved_project != current_project:
-                            continue
-
-                        clean_unsaved_frames = [ f for f in unsaved_frames if f != current_frame ]
-
-                        if not clean_unsaved_frames:
-                            continue
-
-                        msg = f'Critical Error: "{unsaved_project.file}" could not save frames: {clean_unsaved_frames}'
-                        self.stop_rendering('UNSAVED_FRAMES', exit_message=msg)
+                    # print("Saved:", saved_renders)
+                    # print("Unsaved:", unsaved_renders)
 
                     # Change project
                     found = search(r'(?:.*)--background ["](.*?.blend)["].*?-f ["](.*?)["]', line)
@@ -391,7 +383,6 @@ class RenderListenThread(qtc.QThread):
                             self.listOfProjects_setCurrentItem.emit(item)
 
                         current_frame = None
-                        unsaved_renders_dict[project] = []
 
                         continue
 
@@ -458,10 +449,10 @@ class RenderListenThread(qtc.QThread):
                         self.gProgress_setText.emit(f'{preset.global_frame}/{preset.global_frames}')
                         self.pProgress_setText.emit(f'{preset.project_frame}/{preset.project_frames}')
 
-                        while current_frame in unsaved_renders_dict[current_project]:
-                            unsaved_renders_dict[current_project].remove(current_frame)
+                        if current_render and current_render not in saved_renders:
+                            saved_renders.append(current_render)
 
-                        current_project = None
+                        current_render = None
                         current_frame = None
 
                         mw.update_widgets.emit()
@@ -496,8 +487,18 @@ class RenderListenThread(qtc.QThread):
                             self.gProgress_setText.emit(f'{max(0, preset.global_frame - 1)}/{preset.global_frames}')
                             self.pProgress_setText.emit(f'{max(0, preset.project_frame - 1)}/{preset.project_frames}')
 
-                            if current_frame not in unsaved_renders_dict[current_project]:
-                                unsaved_renders_dict[current_project].append(current_frame)
+                            if current_render and current_render not in unsaved_renders:
+                                unsaved_renders.append(current_render)
+
+                                # Delete old render if the new one was not saved
+                                p, f = current_render
+                                path = Path(p.compose_render_filename(f))
+
+                                if path.exists():
+                                    print(f'Removed: {path}')
+                                    path.unlink()
+
+                            current_render = [current_project, current_frame]
 
                         continue
 

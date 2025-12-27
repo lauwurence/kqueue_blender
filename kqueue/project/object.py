@@ -9,6 +9,14 @@ from ..utils.pathutils import join, exists, open_folder, open_image
 from ..config import *
 from .. import store, save_load
 
+FORMATS = {
+    'PNG' : '.png',
+    'WEBP' : '.webp',
+    'JPEG' : '.jpeg',
+    'JPEG2000' : 'jpg2',
+    'TIFF' : '.tiff'
+}
+
 
 class BlendProject():
     active = True
@@ -62,6 +70,12 @@ class BlendProject():
         self.denoising_prefilter, self.denoising_prefilter_override = denoising_prefilter, None
         self.markers = markers
         self.mod_time = mod_time
+
+
+    def is_renderable(self):
+        """ """
+
+        return self.active and self.file_exists() and self.render_filepath_exists()
 
 
     def file_exists(self):
@@ -130,17 +144,6 @@ class BlendProject():
         Get frames as an int list.
         """
 
-        format = self.get_file_format()
-
-        if format == 'PNG':
-            ext = '.png'
-        elif format == 'WEBP':
-            ext = '.webp'
-        elif format == 'JPEG':
-            ext = '.jpeg'
-        else:
-            return []
-
         if not frames:
             if not store.preset.marker_render:
                 frames = self.get_frames()
@@ -151,15 +154,7 @@ class BlendProject():
             rv = []
 
             for frame in filter_frames(frames) or []:
-                filepath = self.get_render_filepath()
-                dir, basename = filepath.rsplit("\\", 1)
-                zeros = basename.count("#") or 4
-                number = str(frame)
-
-                while len(number) < zeros:
-                    number = "0" + number
-
-                filename = f'{dir}\\{basename.replace("#", "")}{number}{ext}'
+                filename = self.compose_render_filename(frame)
 
                 if Path(filename).exists():
                     continue
@@ -179,11 +174,51 @@ class BlendProject():
         return ",".join([ str(frame) for frame in self.get_frames_list(frames) ])
 
 
+    def render_filepath_exists(self):
+        """
+        """
+
+        return Path(self.get_render_filepath()).parent.exists()
+
+
+    def compose_render_filename(self, frame):
+        """
+        Compose render filename.
+        """
+
+        format = self.get_file_format()
+        suffix = FORMATS.get(format, None)
+
+        if suffix is None:
+            raise Exception(f'Unknown image format: {format}')
+
+        filepath = self.get_render_filepath()
+        path = Path(filepath)
+        basename = path.stem
+        zeros = basename.count("#") or 4
+        number = str(frame)
+
+        while len(number) < zeros:
+            number = "0" + number
+
+        to_replace = "#" * zeros
+
+        if to_replace in basename:
+            basename = basename.replace(to_replace, number)
+        else:
+            basename += number
+
+        return path.parent / f'{basename}{suffix}'
+
+
     def get(self, v1, v2, other_list=None):
         rv = v1 if v1 is not None else v2
 
         if other_list and (rv not in other_list):
-            return other_list[0]
+            rv = other_list[0]
+
+        if rv == "None":
+            rv = None
 
         return rv
 
@@ -211,8 +246,14 @@ class BlendProject():
         y = self.get_resolution_y()
         perc = self.get_resolution_percentage()
 
-        if (not x or x == "None") or (not y or x == "None") or (not perc or perc == "None"):
-            return 0, 0
+        if not x or x == "None":
+            x = 0
+
+        if not y or x == "None":
+            y = 0
+
+        if not perc or perc == "None":
+            perc = 0
 
         x = int(x)
         y = int(y)
@@ -269,6 +310,9 @@ class BlendProject():
                 if not name.startswith(path.stem):
                     continue
 
+                if not name.endswith(tuple(FORMATS.values())):
+                    continue
+
                 rv = local_path / name
 
         return rv
@@ -292,9 +336,8 @@ class BlendProject():
         """
 
         path = Path(self.get_render_filepath())
-        dir = path.parent
 
-        if not dir.exists():
+        if not path.parent.exists():
             return None
 
         return path.parent
