@@ -38,7 +38,7 @@ if hasattr(Qt, 'AA_UseHighDpiPixmaps'):
     qtw.QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
 active_monitor = monitor.get_primary_display_info()
-factor = 1.0 + (1080 / active_monitor.height) * 0.5
+factor = 1.0 + ((2160 / active_monitor.height) - 1.0) * 0.5
 
 if DEV_MODE:
     print(f'Monitor: {active_monitor.width}x{active_monitor.height} | Scale: {factor}')
