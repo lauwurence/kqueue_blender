@@ -280,7 +280,7 @@ class QBlendProjectSettings(qtw.QWidget):
             hbox.addWidget(self.frames)
 
             # [button] Frames Reset
-            self.framesReset = QPushButton("", clicked=lambda: self.frames.setText(str(project.get_frames())))
+            self.framesReset = QPushButton("", clicked=lambda: self.frames.setText(str(project.frames)))
             self.framesReset.setFixedHeight(FIELD_HEIGHT)
             self.framesReset.setFixedWidth(30)
             self.framesReset.setIcon(qtg.QIcon('kqueue/icons/reset.svg'))

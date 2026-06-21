@@ -24,6 +24,13 @@ def exists(filename):
     return Path(filename).exists()
 
 
+def delete_file(filename):
+    """
+    """
+
+    Path(filename).unlink(missing_ok=True)
+
+
 FILEBROWSER_PATH = join(getenv('WINDIR'), 'explorer.exe')
 
 

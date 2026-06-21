@@ -18,8 +18,7 @@ from pathlib import Path
 from psutil import Process
 from threading import Thread
 
-from .utils import monitor, utils, gpu
-from .utils.pathutils import join, open_folder, open_image
+from .utils import monitor, utils, gpu, pathutils
 from .project.widgets import QBlendProject, QBlendProjectSettings
 
 from .render import RenderThread
@@ -49,29 +48,20 @@ os.environ["QT_SCALE_FACTOR"] = f'{factor}'
 ################################################################################
 
 # Init path variables
-store.working_dir = join(getcwd() + "/kqueue")
-store.cache_file = Path(join(getcwd(), CACHE_FILE))
-store.persistent_file = Path(join(getcwd(), PERSISTENT_FILE))
-store.bridge_file = Path(join(getcwd(), BRIDGE_FILE))
-store.get_data_py = Path(join(getcwd(), GET_DATA_PY))
-store.get_data_bat = Path(join(getcwd(), GET_DATA_BAT))
-store.temp_folder = Path(join(getcwd(), TEMP_FOLDER))
+store.working_dir = pathutils.join(getcwd() + "/kqueue")
+store.cache_file = Path(pathutils.join(getcwd(), CACHE_FILE))
+store.crash_file = Path(pathutils.join(getcwd(), CRASH_FILE))
+store.persistent_file = Path(pathutils.join(getcwd(), PERSISTENT_FILE))
+store.bridge_file = Path(pathutils.join(getcwd(), BRIDGE_FILE))
+store.get_data_py = Path(pathutils.join(getcwd(), GET_DATA_PY))
+store.get_data_bat = Path(pathutils.join(getcwd(), GET_DATA_BAT))
+store.temp_folder = Path(pathutils.join(getcwd(), TEMP_FOLDER))
 
 print(store.get_data_bat, store.get_data_bat.exists())
 
 
 ################################################################################
-
-# class GlobalPreset():
-
-#     def __init__(self):
-
-#         # Filename of the current preset.
-#         self.filename = None
-
-#         # Path to Blender executable.
-#         self.blender_exe = None
-
+# Preset
 
 class QueuePreset():
 
@@ -247,7 +237,7 @@ class QueuePreset():
         if self.filename and False:
             path = self.filename
         else:
-            path = join(store.working_dir, SAVE_FOLDER)
+            path = pathutils.join(store.working_dir, SAVE_FOLDER)
             makedirs(path, exist_ok=True)
 
         filename, _ = qtw.QFileDialog.getSaveFileName(mw, 'Save', path, "kQueue Project (*.kqp)")
@@ -273,7 +263,7 @@ class QueuePreset():
             if self.filename and False:
                 path = self.filename
             else:
-                path = join(store.working_dir, SAVE_FOLDER)
+                path = pathutils.join(store.working_dir, SAVE_FOLDER)
                 makedirs(path, exist_ok=True)
 
             filename, _ = qtw.QFileDialog.getOpenFileName(mw, 'Load', path, "kQueue Project (*.kqp)")
@@ -559,7 +549,7 @@ class MainWindow(qtw.QMainWindow):
 
         self.setWindowIcon(qtg.QIcon(ICON))
 
-        self.setMinimumWidth(900)
+        self.setMinimumWidth(1100)
         self.setMinimumHeight(600)
         self.setAcceptDrops(True)
         self.setAttribute(Qt.WA_DeleteOnClose)
@@ -681,6 +671,9 @@ class MainWindow(qtw.QMainWindow):
 
                 for project in store.preset.project_list:
 
+                    if not project.active:
+                        continue
+
                     if samples == project.samples_override:
                         continue
 
@@ -703,7 +696,7 @@ class MainWindow(qtw.QMainWindow):
         for sample in [ 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 ]:
             w_setGlobalSamples = QPushButton(f'{sample}', clicked=toggle_global_active(sample))
             w_setGlobalSamples.setFixedSize(48, 24)
-            w_setGlobalSamples.setToolTip(f'Set {sample} samples globally.')
+            w_setGlobalSamples.setToolTip(f'Set {sample} samples for active projects.')
             w_hBoxLayout.addWidget(w_setGlobalSamples)
 
             self.w_setGlobalSamples_list.append(w_setGlobalSamples)
@@ -908,7 +901,7 @@ class MainWindow(qtw.QMainWindow):
             if not preset.renders_list:
                 return
 
-            open_image(preset.renders_list[-1])
+            pathutils.open_image(preset.renders_list[-1])
 
         self.w_openRender = w_openRender = QPushButton("", clicked=lambda: open_render())
         w_openRender.setIcon(qtg.QIcon('kqueue/icons/open_render.svg'))
@@ -923,7 +916,7 @@ class MainWindow(qtw.QMainWindow):
             if not preset.renders_list:
                 return
 
-            open_folder(preset.renders_list[-1])
+            pathutils.open_folder(preset.renders_list[-1])
 
         self.w_openRenderFolder = w_openRenderFolder = QPushButton("", clicked=lambda: open_render_folder())
         w_openRenderFolder.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
@@ -1232,9 +1225,18 @@ class MainWindow(qtw.QMainWindow):
 
 ################################################################################
 
-def log(*args, developer=False):
+def delete_log():
+    """
+    """
+
+    pathutils.delete_file(store.crash_file)
+
+
+def log(*args, developer=False, write=True, open_file=False):
     """
     Print log in console and output text.
+
+    `developer` - print only when we are in developer mode.
     """
 
     if developer and not DEV_MODE:
@@ -1249,6 +1251,29 @@ def log(*args, developer=False):
         mw.log.emit(line)
 
     print(line)
+
+    if write:
+        done = False
+        retries = 100
+
+        while retries > 0:
+
+            try:
+                with open(store.crash_file, 'a', encoding='utf-8') as f:
+                    f.write(f"\n{line}")
+
+                done = True
+
+            except:
+                retries -= 1
+
+            if done:
+                break
+
+            sleep(.01)
+
+    if open_file:
+        pathutils.open_image(store.crash_file)
 
 
 ################################################################################
@@ -1665,13 +1690,20 @@ def __start_periodic(interval=1.0):
 
 
 def main():
-    __start_periodic()
 
-    persistent_data = save_load.load_persistent()
-    last_project_filename = persistent_data.get('last_project_filename')
+    try:
+        delete_log()
 
-    if last_project_filename:
-        preset.load_from(last_project_filename)
+        __start_periodic()
 
-    mw.show()
-    exit(app.exec_())
+        persistent_data = save_load.load_persistent()
+        last_project_filename = persistent_data.get('last_project_filename')
+
+        if last_project_filename:
+            preset.load_from(last_project_filename)
+
+        mw.show()
+        exit(app.exec_())
+
+    except Exception as e:
+        log(f'Critical Exception: {e}', open_file=True)

@@ -1,10 +1,10 @@
 ################################################################################
 ## Convert
 
-import winsound
-import ffmpeg
-import re
 import os
+import re
+import ffmpeg
+import winsound
 
 from pathlib import Path
 from math import ceil
@@ -12,50 +12,86 @@ from sys import argv
 
 ################################################################################
 
-# [0-5], The lower the value, the better quality, but slower.
+# Sets how efficient the compression will be. The lower the value, the better
+# quality, but slower: [0-5]
 CPU_USED = 5
 
-# Video Convert Quality: [4-63] The lower the value, the better quality.
+# Threads count: [0-12] 0 - auto.
+THREADS = 0 #8
+
+# Codec: libvpx-vp8, libvpx-vp9
+CV = 'libvpx-vp9'
+
+# Pixel format: yuv420p or rgb8
+PIX_FMT = 'gbrp' #'yuv420p'
+
+# Video Convert Quality: [4-63] The lower the value, the better quality
 CRF = 20
 
-# Image Extract Quality: [2-32] The lower the value, the better quality.
+# Image Extract Quality: [2-32] The lower the value, the better quality
 QV = 4
 
-# Output video FPS and speed.
-FPS = 48
-SPEED = 1
+# Output video FPS and speed
+FPS = 60
+SPEED = 3
 
-# Interpolate frames, create new ones in between `FPS`.
+# Interpolate frames, create new ones in between `FPS`
 # INTERPOLATE = None #2
 
-# Resolution e.g. (1920, 1080).
+# Resolution e.g. (1920, 1080)
 RESOLUTION = None
+# RESOLUTION = (1920, 1080)
 
-# Deflicker [2-129] size in frames and mode [am, gm, hm, qm, cm, pm, median].
+# Deflicker in frames: [2-129]
 DEFLICKER_SIZE = None #10
+
+# Mode: am, gm, hm, qm, cm, pm, median
 DEFLICKER_MODE = 'pm'
+
+# Incremental save?
+INCREMENTAL_SAVE = False
 
 
 ################################################################################
-# Paths
+## Paths
 
 input_file = Path(argv[1])
 output_file = Path(f'{input_file.stem}.webm')
 
-if input_file.resolve() == output_file.resolve():
-    output_file = Path(f'{input_file.stem} 2.webm')
+# Handle duplicates
+if INCREMENTAL_SAVE:
+    __n = 2
+
+    while output_file.resolve() == input_file.resolve() or output_file.exists():
+
+        if output_file.stat().st_size == 0:
+            output_file.unlink()
+            break
+
+        output_file = Path(f'{input_file.stem}_{__n}.webm')
+
+        __n += 1
 
 
 ################################################################################
-# Functions
+## Functions
 
 def extract_frame(input_regex, output_regex, frame=0):
     """
     Extract `frame` frame and save into separate file.
     """
 
+    filters = []
+
+    # Select frames
+    filters.append(f'select=eq(n\\,{frame})')
+
+    # Set resolution
+    if RESOLUTION is not None:
+        filters.append(f'scale={RESOLUTION[0]}:{RESOLUTION[1]}')
+
     params = {
-        'vf' : rf"select=eq(n\,{frame})",
+        'vf': ",".join(filters),
         'q:v' : QV,
         'loglevel' : 'error',
     }
@@ -87,6 +123,7 @@ def run_1st_pass(input_file, params):
     ffOutput.run(overwrite_output=True)
 
     print("1st pass finished!")
+
     return params
 
 
@@ -99,7 +136,7 @@ def run_2nd_pass(input_file, output_file, params):
 
     params.update({
         'pass': 2,
-        'c:a' : "libvorbis",
+        'c:a' : 'libvorbis',
         'b:a' : 192 * 1000,
         'f' : 'webm'
     })
@@ -112,7 +149,7 @@ def run_2nd_pass(input_file, output_file, params):
 
 
 ################################################################################
-# Main Thread
+## Main
 
 def main():
 
@@ -142,7 +179,13 @@ def main():
             raise Exception(f'Input file "{input_file.resolve()}" does not exist.')
 
         input_regex = input_file
-        output_regex = f'{input_file.stem}.jpg'
+        output_regex = f'{output_file.stem}.jpg'
+
+    # Remove old image
+    output_frame = Path(output_regex)
+
+    if output_frame.exists():
+        output_frame.unlink()
 
     print("Input:", input_file.resolve())
     print("Output:", output_file.resolve())
@@ -152,11 +195,11 @@ def main():
 
     # Convert to webm
     params = {
-        'threads': 8,
-        'c:v': 'libvpx-vp9',
+        'threads': THREADS,
+        'c:v': CV,
 
         # yuv420p or rgb8
-        'pix_fmt' : 'yuv420p',
+        'pix_fmt' : PIX_FMT,
 
         # sRGB Color Space.
         'color_range' : 'pc',
@@ -182,7 +225,7 @@ def main():
         filter.append(f'fps={FPS}')
 
     if SPEED is not None:
-        filter.append(f'setpts=PTS/{int(SPEED)}')
+        filter.append(f'setpts=PTS/{SPEED}')
 
     if RESOLUTION is not None:
         filter.append(f'scale={RESOLUTION[0]}:{RESOLUTION[1]}')
@@ -218,6 +261,7 @@ def main():
 
 
 ################################################################################
-# Run
+## Run
 
-main()
+if __name__ == '__main__':
+    main()

@@ -4,6 +4,7 @@ mw = None
 preset = None
 working_dir = None
 cache_file = None
+crash_file = None
 persistent_file = None
 bridge_file = None
 get_data_py = None

@@ -16,6 +16,7 @@ SAVE_FOLDER = "saves/"
 TEMP_FOLDER = "kqueue/blender/temp/"
 
 CACHE_FILE = "kqueue/blender/.cache"
+CRASH_FILE = "log.txt"
 PERSISTENT_FILE = f"kqueue/{SAVE_FOLDER}/.persistent"
 BRIDGE_FILE = f"{TEMP_FOLDER}data.json"
 GET_DATA_BAT = f"{TEMP_FOLDER}get_data.bat"

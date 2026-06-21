@@ -487,16 +487,16 @@ class RenderListenThread(qtc.QThread):
                             self.gProgress_setText.emit(f'{max(0, preset.global_frame - 1)}/{preset.global_frames}')
                             self.pProgress_setText.emit(f'{max(0, preset.project_frame - 1)}/{preset.project_frames}')
 
-                            if current_render and current_render not in unsaved_renders:
-                                unsaved_renders.append(current_render)
+                            # if current_render and (current_render not in unsaved_renders):
+                            #     unsaved_renders.append(current_render)
 
-                                # Delete old render if the new one was not saved
-                                p, f = current_render
-                                path = Path(p.compose_render_filename(f))
+                            #     # Delete old render if the new one was not saved
+                            #     p, f = current_render
+                            #     path = Path(p.compose_render_filename(f))
 
-                                if path.exists():
-                                    print(f'Removed: {path}')
-                                    path.unlink()
+                            #     if path.exists():
+                            #         path.unlink()
+                            #         print(f'Removed: {path}')
 
                             current_render = [current_project, current_frame]
 

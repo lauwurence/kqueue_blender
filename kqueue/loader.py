@@ -43,6 +43,10 @@ class LoaderThread(qtc.QThread):
         need_save = False
 
         for i, file in enumerate(files):
+
+            if not is_file_openable(file):
+                continue
+
             mod_time = int(Path(file).stat().st_mtime)
 
             # Update the project that already exists
@@ -85,8 +89,7 @@ blender "{file}" --factory-startup --background  --python "{store.get_data_py.re
                                         #    creationflags=subprocess.DETACHED_PROCESS, #DETACHED_PROCESS
                                         #    preexec_fn=os.setsid,
                                         cwd=join(Path(preset.blender_exe).parent),
-                                        shell=True
-                                        )
+                                        shell=True)
 
                 process.wait()
 
@@ -195,3 +198,17 @@ blender "{file}" --factory-startup --background  --python "{store.get_data_py.re
 
         mw.update_list.emit(False)
         mw.update_widgets.emit()
+
+
+
+def is_file_openable(file_path):
+    path = Path(file_path)
+
+    if not path.exists():
+        return True
+
+    try:
+        path.rename(path)
+        return True
+    except:
+        return False

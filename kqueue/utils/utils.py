@@ -27,3 +27,34 @@ def is_laptop_psutil():
 
     except:
         return False
+
+
+# _taskbar_progress = None
+
+
+# def set_taskbar_progress(value):
+#     global _taskbar_progress
+
+#     try:
+#         if _taskbar_progress is None:
+#             _taskbar_progress = TaskbarProgress(int(value))
+#             _taskbar_progress.set_progress_type(ProgressType.NORMAL)
+#             print(_taskbar_progress)
+
+#         _taskbar_progress.set_progress(int(value))
+#         print(value)
+
+#     except Exception as e:
+#         print("!!!!!! --------------------------------------- ", e)
+
+
+# def finish_taskbar_progress():
+#     global _taskbar_progress
+
+#     if _taskbar_progress is None:
+#         return
+
+#     _taskbar_progress.set_progress_type(ProgressType.NOPROGRESS)
+#     _taskbar_progress.flash_done()
+
+#     _taskbar_progress = None
