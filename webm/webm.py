@@ -1,107 +1,51 @@
 ################################################################################
 ## Convert
 
-import os
 import re
 import ffmpeg
 import winsound
 
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from math import ceil
+from time import time
 from sys import argv
 
-################################################################################
-
-# Sets how efficient the compression will be. The lower the value, the better
-# quality, but slower: [0-5]
-CPU_USED = 5
-
-# Threads count: [0-12] 0 - auto.
-THREADS = 0 #8
-
-# Codec: libvpx-vp8, libvpx-vp9
-CV = 'libvpx-vp9'
-
-# Pixel format: yuv420p or rgb8
-PIX_FMT = 'gbrp' #'yuv420p'
-
-# Video Convert Quality: [4-63] The lower the value, the better quality
-CRF = 20
-
-# Image Extract Quality: [2-32] The lower the value, the better quality
-QV = 4
-
-# Output video FPS and speed
-FPS = 60
-SPEED = 3
-
-# Interpolate frames, create new ones in between `FPS`
-# INTERPOLATE = None #2
-
-# Resolution e.g. (1920, 1080)
-RESOLUTION = None
-# RESOLUTION = (1920, 1080)
-
-# Deflicker in frames: [2-129]
-DEFLICKER_SIZE = None #10
-
-# Mode: am, gm, hm, qm, cm, pm, median
-DEFLICKER_MODE = 'pm'
-
-# Incremental save?
-INCREMENTAL_SAVE = False
-
-
-################################################################################
-## Paths
-
-input_file = Path(argv[1])
-output_file = Path(f'{input_file.stem}.webm')
-
-# Handle duplicates
-if INCREMENTAL_SAVE:
-    __n = 2
-
-    while output_file.resolve() == input_file.resolve() or output_file.exists():
-
-        if output_file.stat().st_size == 0:
-            output_file.unlink()
-            break
-
-        output_file = Path(f'{input_file.stem}_{__n}.webm')
-
-        __n += 1
+current_dir = Path.cwd()
 
 
 ################################################################################
 ## Functions
 
-def extract_frame(input_regex, output_regex, frame=0):
+def extract_frame(input_file, output_file, frame=0, resolution=None, qv=2, sharpen=None):
     """
     Extract `frame` frame and save into separate file.
     """
 
     filters = []
 
-    # Select frames
     filters.append(f'select=eq(n\\,{frame})')
 
-    # Set resolution
-    if RESOLUTION is not None:
-        filters.append(f'scale={RESOLUTION[0]}:{RESOLUTION[1]}')
+    if resolution is not None:
+        filters.append(f'scale={resolution[0]}:{resolution[1]}')
+
+    if sharpen:
+        filters.append(f'unsharp=luma_msize_x=3:luma_msize_y=3:luma_amount={sharpen}')
 
     params = {
-        'vf': ",".join(filters),
-        'q:v' : QV,
+        'q:v' : qv,
         'loglevel' : 'error',
+        'vf': ",".join(filters),
     }
 
-    ffInput = ffmpeg.input(str(input_regex))
+    if isinstance(input_file, str) and input_file.startswith('concat:'):
+        ffInput = ffmpeg.input(str(input_file), format='concat', safe=0)
+    else:
+        ffInput = ffmpeg.input(str(input_file))
 
-    ffOutput = ffInput.output(output_regex, **params)
+    ffOutput = ffInput.output(output_file, **params)
     ffOutput.run(overwrite_output=True)
 
-    print(f'Frame {frame} extracted as {output_regex}!')
+    print(f'Frame {frame} extracted: {output_file}')
 
 
 def run_1st_pass(input_file, params):
@@ -113,12 +57,14 @@ def run_1st_pass(input_file, params):
 
     params.update({
         'pass': 1,
-        'maxrate': params['b:v'],
-        'bufsize': params['b:v'] * 2,
         'f': 'null'
     })
 
-    ffInput = ffmpeg.input(str(input_file))
+    if isinstance(input_file, str) and input_file.startswith('concat:'):
+        ffInput = ffmpeg.input(str(input_file), format='concat', safe=0)
+    else:
+        ffInput = ffmpeg.input(str(input_file))
+
     ffOutput = ffInput.output('pipe:', **params)
     ffOutput.run(overwrite_output=True)
 
@@ -141,40 +87,144 @@ def run_2nd_pass(input_file, output_file, params):
         'f' : 'webm'
     })
 
-    ffInput = ffmpeg.input(str(input_file))
+    if isinstance(input_file, str) and input_file.startswith('concat:'):
+        ffInput = ffmpeg.input(str(input_file), format='concat', safe=0)
+    else:
+        ffInput = ffmpeg.input(str(input_file))
+
     ffOutput = ffInput.output(str(output_file), **params)
     ffOutput.run(overwrite_output=True)
 
     print("2nd pass finished.")
 
 
-################################################################################
-## Main
+def get_sorted_images(folder_path):
+    """
+    Get all images from folder and sort them naturally.
+    """
 
-def main():
+    ext = ('.jpg', '.jpeg', '.png', '.webp')
+    rv = []
+
+    for file in folder_path.iterdir():
+
+        if not file.is_file():
+            continue
+
+        if file.suffix.lower() not in ext:
+            continue
+
+        rv.append(file)
+
+    def natural_sort(path):
+        stem = path.stem
+        numbers = re.findall(r'\d+', stem)
+
+        if numbers:
+            return int(numbers[-1])
+
+        return stem
+
+    rv.sort(key=natural_sort)
+
+    return rv
+
+
+################################################################################
+## Convert
+
+def convert(
+        input_file,
+        suffix="",
+        incremental_save=False,
+        cpu_used=5,
+        input_fps=25,
+        output_fps=60,
+        speed=2,
+        cv='libvpx-vp9',
+        pix_fmt='gbrp',
+        resolution=None,
+        threads=0,
+        crf=30,
+        qv=2,
+        sharpen=0.25,
+        interpolate_mode=1,
+        i=None
+        ):
+    """
+    Covert video or a frames folder into .webm.
+
+    Fields:
+        `suffix` - Output filename suffix.
+        `incremental_save` - Incremental save.
+        `cpu_used` - [0-5] - Sets how efficient the compression will be. The lower the value, the better
+        quality, but slower. 4 or 5 is for Ren'Py, программный декодинг зависит от этого.
+        `crf` - [4-63] - Video Convert Quality.  The lower the value, the better quality.
+        `threads` - [0-...] - Threads count. 0 - auto. The lower the threads count, the better quality.
+        `cv` - Codec: 'libvpx-vp8', 'libvpx-vp9'.
+        `pix_fmt` - Pixel format. 'yuv420p' or 'rgb8'.
+        `qv` - [2-32] - Image Extract Quality. The lower the value, the better quality.
+        `input_fps` - Input FPS. Default for ffmpeg is 25.
+        `output_fps` - Output FPS. Default for Ren'Py is 60.
+        `speed` - Video speed.
+        `sharpen` - Sharpen filter.
+        `interpolate_mode` - Frame interpolation quality.
+
+    """
+
+    s = time()
+
+    # Temp files to delete later
+    _temp_files = []
+
+    # Input and output
+    if not isinstance(input_file, Path):
+        input_file = Path(input_file)
+
+    output_file = Path(f'{input_file.stem}{suffix}.webm')
+
+    # Handle duplicates
+    if incremental_save:
+        __n = 2
+
+        while output_file.resolve() == input_file.resolve() or output_file.exists():
+
+            if output_file.stat().st_size == 0:
+                output_file.unlink()
+                break
+
+            output_file = Path(f'{input_file.stem}{suffix}_{__n}.webm')
+
+            __n += 1
 
     # Handle folder with frames
     if input_file.is_dir():
         filenames = list(input_file.iterdir())
 
         if not filenames:
-            raise Exception(f'No frames in directory: {input_file.resolve()}')
+            raise Exception(f'No images found in directory: {input_file.resolve()}')
 
-        file = Path(filenames[0])
-        number = re.findall(r'\d+', file.stem)[-1]
-        basename = file.stem.replace(number, rf'%0{len(number)}d')
-        input_regex = f'{file.parent}/{basename}{file.suffix}'
-        output_regex = f'{file.parent}.jpg'
+        first_file = Path(filenames[0])
+        output_regex = f'{first_file.parent}{suffix}.jpg'
 
-        # Rename images to make them in order
-        if int(number) not in [0, 1]:
-            print(f'Frames are not in order! Renaming {len(filenames)} frames...')
+        sorted_images = get_sorted_images(input_file)
 
-            for i, fn in enumerate(filenames):
-                os.rename(fn, input_regex % i)
+        # Create a temporary file list for ffmpeg concat
+        list_file = input_file / f"{i}.txt"
+        _temp_files.append(list_file)
+
+        with open(list_file, 'w') as f:
+
+            for img in sorted_images:
+                f.write(f"file '{img.absolute()}'\n")
+                f.write(f"duration {1.0 / input_fps / speed}\n")
+
+        # Use concat demuxer for image sequence
+        input_regex = f'concat:{list_file}'
 
     # Handle video file
     else:
+
         if not input_file.exists():
             raise Exception(f'Input file "{input_file.resolve()}" does not exist.')
 
@@ -187,19 +237,24 @@ def main():
     if output_frame.exists():
         output_frame.unlink()
 
-    print("Input:", input_file.resolve())
     print("Output:", output_file.resolve())
 
     # Extract first frame
-    extract_frame(input_regex, output_regex=output_regex)
+    extract_frame(input_regex,
+                  output_regex,
+                  resolution=resolution,
+                  qv=qv,
+                  sharpen=sharpen)
 
-    # Convert to webm
+    # Default
     params = {
-        'threads': THREADS,
-        'c:v': CV,
+        'threads': threads,
+
+        # Codec: libvpx-vp9, libvpx-vp8, libx264, libx265, libaom-av1
+        'c:v': cv,
 
         # yuv420p or rgb8
-        'pix_fmt' : PIX_FMT,
+        'pix_fmt' : pix_fmt,
 
         # sRGB Color Space.
         'color_range' : 'pc',
@@ -208,56 +263,148 @@ def main():
         'colorspace' : 'bt709',
 
         # [0-5], 0> faster, but affects quality.
-        'cpu-used' : CPU_USED,
+        'cpu-used' : cpu_used,
+
         # [4-63], The lower the value, the better quality.
-        'crf' : CRF,
+        'crf' : max(0, min(63, crf)),
+
         # Enable constant quality mode.
         'b:v': 0,
+
+        # Not needed for Ren'Py
+        'maxrate': 0,
+        'bufsize': 0,
 
         # Remove metadata.
         'map_metadata' : -1,
     }
 
-    # Add filters if needed
-    filter = []
+    if i is not None:
+        passlogfile = f'{input_file.stem}-{i}'
+        params.update({'passlogfile' : passlogfile})
+        log_file = current_dir / f'{passlogfile}-0.log'
+        log_file.unlink(missing_ok=True)
+        _temp_files.append(log_file)
 
-    if FPS is not None:
-        filter.append(f'fps={FPS}')
+    # Apply filters
+    filters = []
 
-    if SPEED is not None:
-        filter.append(f'setpts=PTS/{SPEED}')
+    if resolution:
+        filters.append(f'scale={resolution[0]}:{resolution[1]}:flags=lanczos:param0=4')
 
-    if RESOLUTION is not None:
-        filter.append(f'scale={RESOLUTION[0]}:{RESOLUTION[1]}')
+    if sharpen:
+        filters.append(f'unsharp=luma_msize_x=3:luma_msize_y=3:luma_amount={sharpen}')
 
-    if DEFLICKER_SIZE and DEFLICKER_MODE:
-        filter.append(f'deflicker=mode={DEFLICKER_MODE}:size={DEFLICKER_SIZE}')
+    # Быстрый (просто дублирует кадры)
+    if interpolate_mode == 1:
+        filters.append(f'minterpolate=fps={output_fps}:mi_mode=dup')
 
-    # Motion Interpolation https://trac.ffmpeg.org/wiki/How%20to%20speed%20up%20/%20slow%20down%20a%20video
-    # if INTERPOLATE is not None:
-    #     filter.append(f'minterpolate=fps=3')
-        # filter.append(f'minterpolate={FPS * INTERPOLATE},tblend=all_mode=average,framestep=2')
-        # filter.append(f'minterpolate=fps={FPS * INTERPOLATE}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1')
+    # Средний (усредняет соседние кадры)
+    elif interpolate_mode == 2:
+        filters.append(f'minterpolate=fps={output_fps}:mi_mode=blend')
 
-    # Time Blend
-    # # filter.append(f'tblend')
-    # filter.append(f'tblend=all_mode=average')
-    # filter.append(f'tblend=average,setpts={FPS * 0.05}')
+    # Качественный (анализирует движение объектов и создаёт вектор)
+    elif interpolate_mode == 3:
+        filters.append(f'minterpolate=fps={output_fps}:mi_mode=mci:mc_mode=aobmc')
 
-    # Time Mix
-    # filter.append(f'tmix=frames={60/FPS}')
-    # filter.append(f'tmix=frames={ceil(60/FPS)}:weights=50 100 50')
+    # Медленнее x3 (1080p) x12 (2160p) (разбивает на блоки разного размера)
+    elif interpolate_mode == 4:
+        filters.append(f'minterpolate=fps={output_fps}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1')
 
-    if filter:
+    # if SPEED is not None:
+    #     filters.append(f'setpts=PTS/{SPEED}')
+
+    if filters:
         params.update({
-            'filter:v' : ",".join(filter),
+            'filter:v' : ",".join(filters),
         })
 
+    # Run in 2 pass
     params = run_1st_pass(input_regex, params=params)
     run_2nd_pass(input_regex, output_file, params=params)
 
+    # Delete temporary files
+    for f in _temp_files:
+
+        if not isinstance(f, Path):
+            f = Path(f)
+
+        f.unlink(missing_ok=True)
+
+    print(f'Converted in {time() - s:.02f}s: {output_file.resolve()}')
+
+
+################################################################################
+## Main
+
+def main():
+    input_file = Path(argv[1])
+    preset = argv[2]
+    tasks = []
+
+    print("Input:", input_file.resolve())
+
+    if preset in ['android', 'all']:
+        tasks.append({
+            'input_file' : input_file,
+            'suffix' : "#android",
+            'resolution' : (1920, 1080),
+            'cpu_used' : 5,
+            'input_fps' : 25,
+            'output_fps' : 60,
+            'speed' : 2,
+            'cv' : 'libvpx-vp9',
+            'pix_fmt' : 'gbrp',
+            'threads' : 4,
+            'crf' : 45,
+            'qv' : 4,
+            'sharpen' : 0.25,
+            'interpolate_mode' : 1,
+        })
+
+    if preset in ['1080p', 'all']:
+        tasks.append({
+            'input_file' : input_file,
+            'suffix' : "",
+            'resolution' : (1920, 1080),
+            'cpu_used' : 5,
+            'input_fps' : 25,
+            'output_fps' : 60,
+            'speed' : 2,
+            'cv' : 'libvpx-vp9',
+            'pix_fmt' : 'gbrp',
+            'threads' : 4,
+            'crf' : 35,
+            'qv' : 2,
+            'sharpen' : 0.25,
+            'interpolate_mode' : 1,
+        })
+
+    if preset in ['4K', '2160p', 'all']:
+        tasks.append({
+            'input_file' : input_file,
+            'suffix' : "@2",
+            'resolution' : (3840, 2160),
+            'cpu_used' : 5,
+            'input_fps' : 25,
+            'output_fps' : 60,
+            'speed' : 2,
+            'cv' : 'libvpx-vp9',
+            'pix_fmt' : 'gbrp',
+            'threads' : 4,
+            'crf' : 30,
+            'qv' : 2,
+            'sharpen' : 0,
+            'interpolate_mode' : 1,
+        })
+
+    with ProcessPoolExecutor(max_workers=3) as executor:
+        futures = [ executor.submit(convert, i=i, **task) for i, task in enumerate(tasks) ]
+
+        for future in as_completed(futures):
+            print(future.result() or "")
+
     winsound.Beep(frequency=440, duration=750)
-    print("Done")
 
 
 ################################################################################
