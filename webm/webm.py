@@ -322,7 +322,7 @@ def convert(
     if sharpen:
         filters.append(f'unsharp=luma_msize_x=3:luma_msize_y=3:luma_amount={sharpen}')
 
-    # Быстрый (просто дублирует кадры) (
+    # Быстрый (просто дублирует кадры)
     if interpolate_mode == 1:
         filters.append(f'minterpolate=fps={output_fps}:mi_mode=dup')
 
