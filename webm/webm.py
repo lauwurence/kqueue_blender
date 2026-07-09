@@ -42,7 +42,7 @@ def extract_frame(input_file, output_file, frame=0, resolution=None, qv=2, sharp
     else:
         ffInput = ffmpeg.input(str(input_file))
 
-    ffOutput = ffInput.output(output_file, **params)
+    ffOutput = ffInput.output(str(output_file), **params)
     ffOutput.run(overwrite_output=True)
 
     print(f'Frame {frame} extracted: {output_file}')
@@ -130,11 +130,34 @@ def get_sorted_images(folder_path):
     return rv
 
 
+def get_frame_count(input_file):
+    """
+    Get frame count from file.
+    """
+
+    probe = ffmpeg.probe(
+        str(input_file),
+        v='error',
+        count_frames=None,
+        select_streams='v:0',
+        show_entries='stream=nb_read_frames'
+    )
+
+    if probe and 'streams' in probe and probe['streams']:
+        nb_frames = probe['streams'][0].get('nb_read_frames')
+
+        if nb_frames:
+            return int(nb_frames)
+
+    return None
+
+
 ################################################################################
 ## Convert
 
 def convert(
         input_file,
+        name,
         suffix="",
         incremental_save=False,
         cpu_used=5,
@@ -149,7 +172,8 @@ def convert(
         qv=2,
         sharpen=0.25,
         interpolate_mode=1,
-        i=None
+        loop=False,
+        i=None,
         ):
     """
     Covert video or a frames folder into .webm.
@@ -169,6 +193,7 @@ def convert(
         `speed` - Video speed.
         `sharpen` - Sharpen filter.
         `interpolate_mode` - Frame interpolation quality.
+        `loop` - Place first frame at the end and last frame at the start.
 
     """
 
@@ -181,7 +206,7 @@ def convert(
     if not isinstance(input_file, Path):
         input_file = Path(input_file)
 
-    output_file = Path(f'{input_file.stem}{suffix}.webm')
+    output_file = Path(f'{name}{suffix}.webm')
 
     # Handle duplicates
     if incremental_save:
@@ -193,7 +218,7 @@ def convert(
                 output_file.unlink()
                 break
 
-            output_file = Path(f'{input_file.stem}{suffix}_{__n}.webm')
+            output_file = Path(f'{name}{suffix}_{__n}.webm')
 
             __n += 1
 
@@ -204,10 +229,13 @@ def convert(
         if not filenames:
             raise Exception(f'No images found in directory: {input_file.resolve()}')
 
-        first_file = Path(filenames[0])
-        output_regex = f'{first_file.parent}{suffix}.jpg'
-
         sorted_images = get_sorted_images(input_file)
+
+        if loop:
+            first_frame = sorted_images[0]
+            last_frame = sorted_images[-1]
+            sorted_images.insert(0, last_frame)
+            sorted_images.append(first_frame)
 
         # Create a temporary file list for ffmpeg concat
         list_file = input_file / f"{i}.txt"
@@ -220,7 +248,7 @@ def convert(
                 f.write(f"duration {1.0 / input_fps / speed}\n")
 
         # Use concat demuxer for image sequence
-        input_regex = f'concat:{list_file}'
+        input_file = f'concat:{list_file}'
 
     # Handle video file
     else:
@@ -228,11 +256,8 @@ def convert(
         if not input_file.exists():
             raise Exception(f'Input file "{input_file.resolve()}" does not exist.')
 
-        input_regex = input_file
-        output_regex = f'{output_file.stem}.jpg'
-
     # Remove old image
-    output_frame = Path(output_regex)
+    output_frame = current_dir / f'{name}{suffix}.jpg'
 
     if output_frame.exists():
         output_frame.unlink()
@@ -240,8 +265,8 @@ def convert(
     print("Output:", output_file.resolve())
 
     # Extract first frame
-    extract_frame(input_regex,
-                  output_regex,
+    extract_frame(input_file,
+                  output_frame,
                   resolution=resolution,
                   qv=qv,
                   sharpen=sharpen)
@@ -280,7 +305,7 @@ def convert(
     }
 
     if i is not None:
-        passlogfile = f'{input_file.stem}-{i}'
+        passlogfile = f'{name}-{i}'
         params.update({'passlogfile' : passlogfile})
         log_file = current_dir / f'{passlogfile}-0.log'
         log_file.unlink(missing_ok=True)
@@ -289,9 +314,11 @@ def convert(
     # Apply filters
     filters = []
 
+    # Размер
     if resolution:
         filters.append(f'scale={resolution[0]}:{resolution[1]}:flags=lanczos:param0=4')
 
+    # Резкость
     if sharpen:
         filters.append(f'unsharp=luma_msize_x=3:luma_msize_y=3:luma_amount={sharpen}')
 
@@ -314,14 +341,15 @@ def convert(
     # if SPEED is not None:
     #     filters.append(f'setpts=PTS/{SPEED}')
 
+    # Combine filters
     if filters:
         params.update({
             'filter:v' : ",".join(filters),
         })
 
     # Run in 2 pass
-    params = run_1st_pass(input_regex, params=params)
-    run_2nd_pass(input_regex, output_file, params=params)
+    params = run_1st_pass(input_file, params=params)
+    run_2nd_pass(input_file, output_file, params=params)
 
     # Delete temporary files
     for f in _temp_files:
@@ -347,6 +375,7 @@ def main():
     if preset in ['android', 'all']:
         tasks.append({
             'input_file' : input_file,
+            'name' : input_file.stem,
             'suffix' : "#android",
             'resolution' : (1920, 1080),
             'cpu_used' : 5,
@@ -359,12 +388,14 @@ def main():
             'crf' : 45,
             'qv' : 4,
             'sharpen' : 0.25,
-            'interpolate_mode' : 1,
+            'interpolate_mode' : 2,
+            'loop' : True,
         })
 
     if preset in ['1080p', 'all']:
         tasks.append({
             'input_file' : input_file,
+            'name' : input_file.stem,
             'suffix' : "",
             'resolution' : (1920, 1080),
             'cpu_used' : 5,
@@ -377,12 +408,14 @@ def main():
             'crf' : 35,
             'qv' : 2,
             'sharpen' : 0.25,
-            'interpolate_mode' : 1,
+            'interpolate_mode' : 2,
+            'loop' : True,
         })
 
     if preset in ['4K', '2160p', 'all']:
         tasks.append({
             'input_file' : input_file,
+            'name' : input_file.stem,
             'suffix' : "@2",
             'resolution' : (3840, 2160),
             'cpu_used' : 5,
@@ -395,7 +428,8 @@ def main():
             'crf' : 30,
             'qv' : 2,
             'sharpen' : 0,
-            'interpolate_mode' : 1,
+            'interpolate_mode' : 2,
+            'loop' : True,
         })
 
     with ProcessPoolExecutor(max_workers=3) as executor:
