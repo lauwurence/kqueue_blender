@@ -322,15 +322,15 @@ def convert(
     if sharpen:
         filters.append(f'unsharp=luma_msize_x=3:luma_msize_y=3:luma_amount={sharpen}')
 
-    # Быстрый (просто дублирует кадры)
+    # Быстрый (просто дублирует кадры) (
     if interpolate_mode == 1:
         filters.append(f'minterpolate=fps={output_fps}:mi_mode=dup')
 
-    # Средний (усредняет соседние кадры)
+    # Средний (усредняет соседние кадры) (очень плохой результат)
     elif interpolate_mode == 2:
         filters.append(f'minterpolate=fps={output_fps}:mi_mode=blend')
 
-    # Качественный (анализирует движение объектов и создаёт вектор)
+    # Качественный (анализирует движение объектов и создаёт вектор) (очень хороший результат)
     elif interpolate_mode == 3:
         filters.append(f'minterpolate=fps={output_fps}:mi_mode=mci:mc_mode=aobmc')
 
@@ -388,7 +388,7 @@ def main():
             'crf' : 45,
             'qv' : 4,
             'sharpen' : 0.25,
-            'interpolate_mode' : 2,
+            'interpolate_mode' : 3,
             'loop' : True,
         })
 
@@ -408,7 +408,7 @@ def main():
             'crf' : 35,
             'qv' : 2,
             'sharpen' : 0.25,
-            'interpolate_mode' : 2,
+            'interpolate_mode' : 3,
             'loop' : True,
         })
 
@@ -428,7 +428,7 @@ def main():
             'crf' : 30,
             'qv' : 2,
             'sharpen' : 0,
-            'interpolate_mode' : 2,
+            'interpolate_mode' : 3,
             'loop' : True,
         })
 
