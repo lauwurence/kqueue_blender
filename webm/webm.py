@@ -2,6 +2,7 @@
 ## Convert
 
 import re
+import json
 import ffmpeg
 import winsound
 
@@ -173,6 +174,7 @@ def convert(
         sharpen=0.25,
         interpolate_mode=1,
         loop=False,
+        reverse=False,
         i=None,
         ):
     """
@@ -198,6 +200,9 @@ def convert(
     """
 
     s = time()
+
+    if reverse:
+        name += "_reverse"
 
     # Temp files to delete later
     _temp_files = []
@@ -236,6 +241,9 @@ def convert(
             last_frame = sorted_images[-1]
             sorted_images.insert(0, last_frame)
             sorted_images.append(first_frame)
+
+        if reverse:
+            sorted_images.reverse()
 
         # Create a temporary file list for ffmpeg concat
         list_file = input_file / f"{i}.txt"
@@ -367,70 +375,94 @@ def convert(
 
 def main():
     input_file = Path(argv[1])
+    json_file = input_file / "data.json"
     preset = argv[2]
     tasks = []
 
     print("Input:", input_file.resolve())
 
+    NAMES = [
+        'pix_fmt',
+        'speed',
+        'loop',
+        'reverse',
+        'interpolate_mode',
+        'cpu_used',
+        'threads',
+        'crf',
+        'qv',
+        'sharpen',
+    ]
+
+    vars = {
+        'pix_fmt' : 'yuv420p', #gbrp
+        'speed' : 1.0,
+        'loop' : True,
+        'reverse' : False,
+        'interpolate_mode' : 3,
+        'cpu_used' : 5,
+        'threads' : 4,
+        'crf' : [45, 35, 30],
+        'qv' : [4, 2, 2],
+        'sharpen' : [.25, .25, 0.0],
+    }
+
+    if json_file.exists():
+        print("Settings:", json_file)
+
+        with open(json_file, 'r') as f:
+            data = json.load(f)
+
+        for name in NAMES:
+
+            if name not in data:
+                continue
+
+            vars[name] = data[name]
+
+    for name in NAMES:
+
+        if not isinstance(vars[name], list):
+            vars[name] = [ vars[name] ] * 3
+
     if preset in ['android', 'all']:
+        params = { k : v[0] for k, v in vars.items() }
+
         tasks.append({
             'input_file' : input_file,
             'name' : input_file.stem,
             'suffix' : "#android",
             'resolution' : (1920, 1080),
-            'cpu_used' : 5,
             'input_fps' : 25,
             'output_fps' : 60,
-            'speed' : 2,
             'cv' : 'libvpx-vp9',
-            'pix_fmt' : 'gbrp',
-            'threads' : 4,
-            'crf' : 45,
-            'qv' : 4,
-            'sharpen' : 0.25,
-            'interpolate_mode' : 3,
-            'loop' : True,
-        })
+        } | params)
 
     if preset in ['1080p', 'all']:
+        params = { k : v[1] for k, v in vars.items() }
+
         tasks.append({
             'input_file' : input_file,
             'name' : input_file.stem,
             'suffix' : "",
             'resolution' : (1920, 1080),
-            'cpu_used' : 5,
             'input_fps' : 25,
             'output_fps' : 60,
-            'speed' : 2,
             'cv' : 'libvpx-vp9',
-            'pix_fmt' : 'gbrp',
-            'threads' : 4,
-            'crf' : 35,
-            'qv' : 2,
-            'sharpen' : 0.25,
-            'interpolate_mode' : 3,
-            'loop' : True,
-        })
+        } | params)
 
     if preset in ['4K', '2160p', 'all']:
+        params = { k : v[2] for k, v in vars.items() }
+
         tasks.append({
             'input_file' : input_file,
             'name' : input_file.stem,
             'suffix' : "@2",
             'resolution' : (3840, 2160),
-            'cpu_used' : 5,
             'input_fps' : 25,
             'output_fps' : 60,
-            'speed' : 2,
             'cv' : 'libvpx-vp9',
-            'pix_fmt' : 'gbrp',
-            'threads' : 4,
-            'crf' : 30,
-            'qv' : 2,
-            'sharpen' : 0,
-            'interpolate_mode' : 3,
-            'loop' : True,
-        })
+        } | params)
 
     with ProcessPoolExecutor(max_workers=3) as executor:
         futures = [ executor.submit(convert, i=i, **task) for i, task in enumerate(tasks) ]
@@ -438,7 +470,7 @@ def main():
         for future in as_completed(futures):
             print(future.result() or "")
 
-    winsound.Beep(frequency=440, duration=750)
+    winsound.Beep(frequency=440, duration=250)
 
 
 ################################################################################
