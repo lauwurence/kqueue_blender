@@ -26,6 +26,7 @@ class BlendProject():
     resolution_x, resolution_x_override = None, None
     resolution_y, resolution_y_override = None, None
     resolution_percentage, resolution_percentage_override = None, None
+    notes = ""
 
     def __init__(self,
                  file,
@@ -70,6 +71,7 @@ class BlendProject():
         self.denoising_prefilter, self.denoising_prefilter_override = denoising_prefilter, None
         self.markers = markers
         self.mod_time = mod_time
+        self.notes = ""
 
 
     def is_renderable(self):
@@ -172,6 +174,12 @@ class BlendProject():
         """
 
         return ",".join([ str(frame) for frame in self.get_frames_list(frames) ])
+
+
+    def get_notes(self):
+        """
+        """
+        return self.notes or ""
 
 
     def render_filepath_exists(self):

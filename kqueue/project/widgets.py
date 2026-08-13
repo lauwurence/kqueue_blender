@@ -232,6 +232,15 @@ class QBlendProject(qtw.QWidget):
         if not self.project.render_filepath_exists():
             self.w_render_filepath.setStyleSheet("color: red;")
 
+    def set_tooltip(self, text):
+
+        if not text:
+            tt = None
+        else:
+            tt = text.strip()
+
+        self.setToolTip(tt or None)
+
 
 ################################################################################
 ## Project Settings Window
@@ -251,7 +260,7 @@ class QBlendProjectSettings(qtw.QWidget):
         self.setWindowTitle(str(self.project.file))
         self.setWindowIcon(qtg.QIcon(ICON))
         self.setMinimumWidth(450)
-        self.setFixedHeight(425)
+        self.setFixedHeight(525)
         self.setWindowModality(Qt.ApplicationModal)
         self.resize(450, 400)
 
@@ -458,6 +467,17 @@ class QBlendProjectSettings(qtw.QWidget):
         l_form.addRow("Prefilter", self.denoiserPrefilter)
 
 
+        # [hbox] Notes
+        hbox = qtw.QHBoxLayout()
+        l_form.addRow("Notes", hbox)
+
+        # [edit] Notes
+        self.notes = qtw.QTextEdit(str(project.get_notes()))
+        self.notes.setFixedHeight(FIELD_HEIGHT * 3)
+        self.notes.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        hbox.addWidget(self.notes)
+
+
         layout.addSpacing(10)
 
 
@@ -546,6 +566,7 @@ class QBlendProjectSettings(qtw.QWidget):
         set_value('denoising_use_gpu_override', eval(self.denoiserUseGPU.text()))
         set_value('denoising_input_passes', self.denoiserInputPasses.currentText())
         set_value('denoising_prefilter', self.denoiserPrefilter.currentText())
+        set_value('notes', self.notes.toPlainText())
 
         if need_save:
             store.preset.set_need_save()

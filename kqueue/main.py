@@ -1074,6 +1074,7 @@ class MainWindow(qtw.QMainWindow):
             w_project.set_filename(project.file)
             w_project.set_active(project.active)
             w_project.set_frames(project.get_frames())
+            w_project.set_tooltip(project.get_notes())
 
             x, y = project.get_final_resolution()
             w_project.set_resolution(f'{x}x{y}')

@@ -44,6 +44,9 @@ def open_folder(filename):
 
     path = normpath(filename)
 
+    if not exists(path):
+        return
+
     if isdir(path):
         subprocess.run([FILEBROWSER_PATH, path])
 
@@ -54,6 +57,9 @@ def open_folder(filename):
 def open_image(filename):
     """
     """
+
+    if not exists(filename):
+        return
 
     def do_open_image():
         webbrowser.open(filename)
