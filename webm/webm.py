@@ -6,6 +6,7 @@ import json
 import ffmpeg
 import winsound
 
+from datetime import datetime
 from multiprocessing import Manager
 from PIL import Image, ImageCms, ImageEnhance
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -21,8 +22,9 @@ RESAMPLE = Image.Resampling.LANCZOS
 
 EXIF_DATA = {
     ('artist', 315) : "keyclap",
-    ('copyright', 33432) : "Copyright 2026 keyclap. All Rights Reserved.",
+    ('copyright', 33432) : f"Copyright {datetime.now().year} keyclap. All Rights Reserved.",
 }
+
 
 ################################################################################
 ## Functions
@@ -222,6 +224,9 @@ def convert(
         pix_fmt='gbrp',
         resolution=None,
         threads=0,
+        row_mt=1,
+        tile_columns=1,
+        tile_rows=0,
         crf=30,
         qv=2,
         image_quality=90,
@@ -304,7 +309,6 @@ def convert(
         # Create a temporary file list for ffmpeg concat
         list_file = file / f"{i}.txt"
         _temp_files.append(list_file)
-        all_temp_files.append(list_file)
 
         with open(list_file, 'w') as f:
 
@@ -337,7 +341,11 @@ def convert(
 
     # Default
     params = {
+        'row-mt' : row_mt,
+        'tile-columns' : tile_columns,
+        'tile-rows' : tile_rows,
         'threads' : threads,
+        # 'frame-parallel' : 1,
 
         # Codec: libvpx-vp9, libvpx-vp8, libx264, libx265, libaom-av1
         'c:v' : cv,
@@ -345,28 +353,26 @@ def convert(
         # yuv420p or rgb8
         'pix_fmt' : pix_fmt,
 
-        # sRGB Color Space.
+        # sRGB Color Space
         'color_range' : 'pc',
         'color_primaries' : 'bt709',
         'color_trc' : 'bt709',
         'colorspace' : 'bt709',
 
-        # [0-5], 0> faster, but affects quality.
+        # [0-5], 0> faster, but affects quality
         'cpu-used' : cpu_used,
 
-        # [4-63], The lower the value, the better quality.
+        # [4-63], The lower the value, the better quality
         'crf' : max(0, min(63, crf)),
 
-        # Enable constant quality mode.
+        # Enable constant quality mode
         'b:v' : 0,
 
         # Not needed for Ren'Py
         'maxrate' : 0,
         'bufsize' : 0,
 
-        'frame-parallel' : 1,
-
-        # Remove metadata.
+        # Remove metadata
         'map_metadata' : -1,
     }
 
@@ -376,7 +382,6 @@ def convert(
         log_file = current_dir / f'{passlogfile}-0.log'
         log_file.unlink(missing_ok=True)
         _temp_files.append(log_file)
-        all_temp_files.append(log_file)
 
     # Apply filters
     filters = []
@@ -449,9 +454,13 @@ DEFAULTS = {
     'reverse' : False,
     'interpolate_mode' : [3, 3, 3],
     'cpu_used' : 4,
-    'threads' : 8,#4,
+    'threads' : [4, 8, 16],#4,
+    'row_mt' : [1, 1, 1],
+    'tile_columns' : [1, 2, 2],
+    'tile_rows' : [0, 0, 1],
     'crf' : [40, 30, 25],
     'qv' : [4, 2, 2],
+    # 'deadline' : 'best',
     'image_quality' : [75, 90, 95],
     'sharpen' : [0.25, 0.25, 0.0],
 }
@@ -464,7 +473,7 @@ def main():
 
     print(f'Input: {input_file.resolve()}')
 
-    if json_file.exists():
+    if input_file.is_dir() and json_file.exists():
         print(f'Settings: {json_file.resolve()}')
 
         with open(json_file, 'r') as f:
