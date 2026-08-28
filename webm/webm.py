@@ -6,6 +6,7 @@ import json
 import ffmpeg
 import winsound
 
+from multiprocessing import Manager
 from PIL import Image, ImageCms, ImageEnhance
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -210,6 +211,7 @@ def get_frame_count(file):
 def convert(
         file,
         name,
+        all_temp_files,
         suffix="",
         incremental_save=False,
         cpu_used=5,
@@ -227,8 +229,8 @@ def convert(
         interpolate_mode=1,
         loop=False,
         reverse=False,
-        i=None,
-        ):
+        i=None):
+
     """
     Covert video or a frames folder into .webm.
 
@@ -254,11 +256,11 @@ def convert(
 
     s = time()
 
-    if reverse:
-        name += "_reverse"
-
     # Temp files to delete later
     _temp_files = []
+
+    if reverse:
+        name += "_reverse"
 
     # Input and output
     if not isinstance(file, Path):
@@ -302,6 +304,7 @@ def convert(
         # Create a temporary file list for ffmpeg concat
         list_file = file / f"{i}.txt"
         _temp_files.append(list_file)
+        all_temp_files.append(list_file)
 
         with open(list_file, 'w') as f:
 
@@ -373,6 +376,7 @@ def convert(
         log_file = current_dir / f'{passlogfile}-0.log'
         log_file.unlink(missing_ok=True)
         _temp_files.append(log_file)
+        all_temp_files.append(log_file)
 
     # Apply filters
     filters = []
@@ -420,7 +424,12 @@ def convert(
         if not isinstance(f, Path):
             f = Path(f)
 
+        if not f.exists():
+            continue
+
         f.unlink(missing_ok=True)
+
+    winsound.Beep(frequency=240, duration=250)
 
     print(f'Converted in {time() - s:.02f}s: {output_file.resolve()}')
 
@@ -429,23 +438,23 @@ def convert(
 ## Main
 
 DEFAULTS = {
-        'suffix' : ["#android", "", "@2"],
-        'cv' : 'libvpx-vp9',
-        'resolution' : [(1920, 1080), (1920, 1080), (3840, 2160)],
-        'input_fps' : 25,
-        'output_fps' : 60,
-        'speed' : 1.0,
-        'pix_fmt' : 'yuv420p', #gbrp
-        'loop' : True,
-        'reverse' : False,
-        'interpolate_mode' : [3, 3, 3],
-        'cpu_used' : 4,
-        'threads' : 8,#4,
-        'crf' : [40, 30, 25],
-        'qv' : [4, 2, 2],
-        'image_quality' : [75, 90, 95],
-        'sharpen' : [0.25, 0.25, 0.0],
-    }
+    'suffix' : ["#android", "", "@2"],
+    'cv' : 'libvpx-vp9',
+    'resolution' : [(1920, 1080), (1920, 1080), (3840, 2160)],
+    'input_fps' : 25,
+    'output_fps' : 60,
+    'speed' : 1.0,
+    'pix_fmt' : 'yuv420p', #gbrp
+    'loop' : True,
+    'reverse' : False,
+    'interpolate_mode' : [3, 3, 3],
+    'cpu_used' : 4,
+    'threads' : 8,#4,
+    'crf' : [40, 30, 25],
+    'qv' : [4, 2, 2],
+    'image_quality' : [75, 90, 95],
+    'sharpen' : [0.25, 0.25, 0.0],
+}
 
 def main():
     json_file = input_file / "data.json"
@@ -472,7 +481,6 @@ def main():
         print(f'Settings file not found: {json_file.resolve()}')
 
     for name in params.keys():
-
         if not isinstance(params[name], list):
             params[name] = [ params[name] ] * 3
 
@@ -494,13 +502,14 @@ def main():
             'name' : input_file.stem,
         } | { k : v[2] for k, v in params.items() }
 
-    with ProcessPoolExecutor(max_workers=len(tasks)) as executor:
-        futures = [ executor.submit(convert, i=i, **task) for i, task in tasks.items() ]
+    with Manager() as manager:
+        all_temp_files = manager.list()
 
-        for future in as_completed(futures):
-            print(future.result() or "")
+        with ProcessPoolExecutor(max_workers=len(tasks)) as executor:
+            futures = [ executor.submit(convert, i=i, **task, all_temp_files=all_temp_files) for i, task in tasks.items() ]
 
-    winsound.Beep(frequency=240, duration=250)
+            for future in as_completed(futures):
+                print(future.result() or "")
 
 
 ################################################################################
