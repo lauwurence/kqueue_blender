@@ -6,6 +6,7 @@ import json
 import ffmpeg
 import winsound
 
+from PIL import Image, ImageCms, ImageEnhance
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from time import time
@@ -13,6 +14,13 @@ from sys import argv
 
 current_dir = Path.cwd()
 
+PROFILE_SRGB = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+RESAMPLE = Image.Resampling.LANCZOS
+
+EXIF_DATA = {
+    ('artist', 315) : "keyclap",
+    ('copyright', 33432) : "Copyright 2026 keyclap. All Rights Reserved.",
+}
 
 ################################################################################
 ## Functions
@@ -21,6 +29,11 @@ def extract_frame(input_file, output_file, frame=0, resolution=None, qv=2, sharp
     """
     Extract `frame` frame and save into separate file.
     """
+
+    print("Output:", output_file.resolve())
+
+    if output_file.exists():
+        output_file.unlink()
 
     filters = []
 
@@ -47,6 +60,43 @@ def extract_frame(input_file, output_file, frame=0, resolution=None, qv=2, sharp
     ffOutput.run(overwrite_output=True)
 
     print(f'Frame {frame} extracted: {output_file}')
+
+
+def save_image(input_file, output_file, resolution=None, quality=100, sharpen=None):
+
+    with Image.open(input_file) as img:
+
+        if resolution is None:
+            width = img.width
+            height = img.height
+        else:
+            width = resolution[0]
+            height = resolution[1]
+
+        if sharpen is not None:
+            enhancer = ImageEnhance.Sharpness(img)
+            img = enhancer.enhance(sharpen * 10)
+
+        img.thumbnail((width, height), resample=RESAMPLE)
+        icc_profile = img.info.get('icc_profile', PROFILE_SRGB)
+        exif = img.getexif()
+
+        # Edit EXIF info
+        for (label, index), value in EXIF_DATA.items():
+            exif[index] = value
+
+        # Convert from ARGB to RGB
+        rgb_img = img.convert('RGB')
+        compression = 'jpeg'
+
+        rgb_img.save(output_file,
+                     format='JPEG',
+                     quality=int(quality),
+                     compression=compression,
+                     icc_profile=icc_profile,
+                     exif=exif)
+
+    print(f'Image saved: {output_file}')
 
 
 def run_1st_pass(input_file, params):
@@ -171,6 +221,7 @@ def convert(
         threads=0,
         crf=30,
         qv=2,
+        image_quality=90,
         sharpen=0.25,
         interpolate_mode=1,
         loop=False,
@@ -190,6 +241,7 @@ def convert(
         `cv` - Codec: 'libvpx-vp8', 'libvpx-vp9'.
         `pix_fmt` - Pixel format. 'yuv420p' or 'rgb8'.
         `qv` - [2-32] - Image Extract Quality. The lower the value, the better quality.
+        `image_quality` - [0-100] - Image save quality.
         `input_fps` - Input FPS. Default for ffmpeg is 25.
         `output_fps` - Output FPS. Default for Ren'Py is 60.
         `speed` - Video speed.
@@ -212,12 +264,13 @@ def convert(
         input_file = Path(input_file)
 
     output_file = Path(f'{name}{suffix}.webm')
+    output_frame = current_dir / f'{name}{suffix}.jpg'
 
     # Handle duplicates
     if incremental_save:
         __n = 2
 
-        while output_file.resolve() == input_file.resolve() or output_file.exists():
+        while output_file.exists() or (output_file.resolve() == input_file.resolve()):
 
             if output_file.stat().st_size == 0:
                 output_file.unlink()
@@ -258,33 +311,32 @@ def convert(
         # Use concat demuxer for image sequence
         input_file = f'concat:{list_file}'
 
+        # Save image
+        save_image(sorted_images[0],
+                   output_frame,
+                   resolution=resolution,
+                   quality=image_quality,
+                   sharpen=sharpen)
+
     # Handle video file
     else:
 
         if not input_file.exists():
-            raise Exception(f'Input file "{input_file.resolve()}" does not exist.')
+            raise Exception(f'Input file does not exist: {input_file.resolve()}')
 
-    # Remove old image
-    output_frame = current_dir / f'{name}{suffix}.jpg'
-
-    if output_frame.exists():
-        output_frame.unlink()
-
-    print("Output:", output_file.resolve())
-
-    # Extract first frame
-    extract_frame(input_file,
-                  output_frame,
-                  resolution=resolution,
-                  qv=qv,
-                  sharpen=sharpen)
+        # Extract first frame
+        extract_frame(input_file,
+                      output_frame,
+                      resolution=resolution,
+                      qv=qv,
+                      sharpen=sharpen)
 
     # Default
     params = {
-        'threads': threads,
+        'threads' : threads,
 
         # Codec: libvpx-vp9, libvpx-vp8, libx264, libx265, libaom-av1
-        'c:v': cv,
+        'c:v' : cv,
 
         # yuv420p or rgb8
         'pix_fmt' : pix_fmt,
@@ -302,11 +354,13 @@ def convert(
         'crf' : max(0, min(63, crf)),
 
         # Enable constant quality mode.
-        'b:v': 0,
+        'b:v' : 0,
 
         # Not needed for Ren'Py
-        'maxrate': 0,
-        'bufsize': 0,
+        'maxrate' : 0,
+        'bufsize' : 0,
+
+        'frame-parallel' : 1,
 
         # Remove metadata.
         'map_metadata' : -1,
@@ -373,104 +427,80 @@ def convert(
 ################################################################################
 ## Main
 
+DEFAULTS = {
+        'suffix' : ["#android", "", "@2"],
+        'cv' : 'libvpx-vp9',
+        'resolution' : [(1920, 1080), (1920, 1080), (3840, 2160)],
+        'input_fps' : 25,
+        'output_fps' : 60,
+        'speed' : 1.0,
+        'pix_fmt' : 'yuv420p', #gbrp
+        'loop' : True,
+        'reverse' : False,
+        'interpolate_mode' : [3, 3, 3],
+        'cpu_used' : 4,
+        'threads' : 8,#4,
+        'crf' : [40, 30, 25],
+        'qv' : [4, 2, 2],
+        'image_quality' : [75, 90, 95],
+        'sharpen' : [0.25, 0.25, 0.0],
+    }
+
 def main():
     input_file = Path(argv[1])
     json_file = input_file / "data.json"
     preset = argv[2]
-    tasks = []
+    tasks = {}
+    params = DEFAULTS.copy()
 
-    print("Input:", input_file.resolve())
-
-    NAMES = [
-        'pix_fmt',
-        'speed',
-        'loop',
-        'reverse',
-        'interpolate_mode',
-        'cpu_used',
-        'threads',
-        'crf',
-        'qv',
-        'sharpen',
-    ]
-
-    vars = {
-        'pix_fmt' : 'yuv420p', #gbrp
-        'speed' : 1.0,
-        'loop' : True,
-        'reverse' : False,
-        'interpolate_mode' : 3,
-        'cpu_used' : 5,
-        'threads' : 4,
-        'crf' : [45, 35, 30],
-        'qv' : [4, 2, 2],
-        'sharpen' : [.25, .25, 0.0],
-    }
+    print(f'Input: {input_file.resolve()}')
 
     if json_file.exists():
-        print("Settings:", json_file)
+        print(f'Settings: {json_file.resolve()}')
 
         with open(json_file, 'r') as f:
             data = json.load(f)
 
-        for name in NAMES:
+        for name in params.keys():
 
             if name not in data:
                 continue
 
-            vars[name] = data[name]
+            params[name] = data[name]
 
-    for name in NAMES:
+    else:
+        print(f'Settings file not found: {json_file.resolve()}')
 
-        if not isinstance(vars[name], list):
-            vars[name] = [ vars[name] ] * 3
+    for name in params.keys():
+
+        if not isinstance(params[name], list):
+            params[name] = [ params[name] ] * 3
 
     if preset in ['android', 'all']:
-        params = { k : v[0] for k, v in vars.items() }
-
-        tasks.append({
+        tasks[0] = {
             'input_file' : input_file,
             'name' : input_file.stem,
-            'suffix' : "#android",
-            'resolution' : (1920, 1080),
-            'input_fps' : 25,
-            'output_fps' : 60,
-            'cv' : 'libvpx-vp9',
-        } | params)
+        } | { k : v[0] for k, v in params.items() }
 
     if preset in ['1080p', 'all']:
-        params = { k : v[1] for k, v in vars.items() }
-
-        tasks.append({
+        tasks[1] = {
             'input_file' : input_file,
             'name' : input_file.stem,
-            'suffix' : "",
-            'resolution' : (1920, 1080),
-            'input_fps' : 25,
-            'output_fps' : 60,
-            'cv' : 'libvpx-vp9',
-        } | params)
+        } | { k : v[1] for k, v in params.items() }
 
     if preset in ['4K', '2160p', 'all']:
-        params = { k : v[2] for k, v in vars.items() }
-
-        tasks.append({
+        tasks[2] = {
             'input_file' : input_file,
             'name' : input_file.stem,
-            'suffix' : "@2",
-            'resolution' : (3840, 2160),
-            'input_fps' : 25,
-            'output_fps' : 60,
-            'cv' : 'libvpx-vp9',
-        } | params)
+        } | { k : v[2] for k, v in params.items() }
 
-    with ProcessPoolExecutor(max_workers=3) as executor:
-        futures = [ executor.submit(convert, i=i, **task) for i, task in enumerate(tasks) ]
+    with ProcessPoolExecutor(max_workers=len(tasks)) as executor:
+        futures = [ executor.submit(convert, i=i, **task) for i, task in tasks.items() ]
 
         for future in as_completed(futures):
             print(future.result() or "")
 
-    winsound.Beep(frequency=440, duration=250)
+    winsound.Beep(frequency=240, duration=250)
 
 
 ################################################################################
