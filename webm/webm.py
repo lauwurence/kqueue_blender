@@ -12,7 +12,8 @@ from pathlib import Path
 from time import time
 from sys import argv
 
-current_dir = Path.cwd()
+input_file = Path(argv[1])
+current_dir = input_file.parent
 
 PROFILE_SRGB = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
 RESAMPLE = Image.Resampling.LANCZOS
@@ -25,7 +26,7 @@ EXIF_DATA = {
 ################################################################################
 ## Functions
 
-def extract_frame(input_file, output_file, frame=0, resolution=None, qv=2, sharpen=None):
+def extract_frame(file, output_file, frame=0, resolution=None, qv=2, sharpen=None):
     """
     Extract `frame` frame and save into separate file.
     """
@@ -51,10 +52,10 @@ def extract_frame(input_file, output_file, frame=0, resolution=None, qv=2, sharp
         'vf': ",".join(filters),
     }
 
-    if isinstance(input_file, str) and input_file.startswith('concat:'):
-        ffInput = ffmpeg.input(str(input_file), format='concat', safe=0)
+    if isinstance(file, str) and file.startswith('concat:'):
+        ffInput = ffmpeg.input(str(file), format='concat', safe=0)
     else:
-        ffInput = ffmpeg.input(str(input_file))
+        ffInput = ffmpeg.input(str(file))
 
     ffOutput = ffInput.output(str(output_file), **params)
     ffOutput.run(overwrite_output=True)
@@ -62,9 +63,9 @@ def extract_frame(input_file, output_file, frame=0, resolution=None, qv=2, sharp
     print(f'Frame {frame} extracted: {output_file}')
 
 
-def save_image(input_file, output_file, resolution=None, quality=100, sharpen=None):
+def save_image(file, output_file, resolution=None, quality=100, sharpen=None):
 
-    with Image.open(input_file) as img:
+    with Image.open(file) as img:
 
         if resolution is None:
             width = img.width
@@ -99,7 +100,7 @@ def save_image(input_file, output_file, resolution=None, quality=100, sharpen=No
     print(f'Image saved: {output_file}')
 
 
-def run_1st_pass(input_file, params):
+def run_1st_pass(file, params):
     """
     Run 1st pass, create log file and return params.
     """
@@ -111,10 +112,10 @@ def run_1st_pass(input_file, params):
         'f': 'null'
     })
 
-    if isinstance(input_file, str) and input_file.startswith('concat:'):
-        ffInput = ffmpeg.input(str(input_file), format='concat', safe=0)
+    if isinstance(file, str) and file.startswith('concat:'):
+        ffInput = ffmpeg.input(str(file), format='concat', safe=0)
     else:
-        ffInput = ffmpeg.input(str(input_file))
+        ffInput = ffmpeg.input(str(file))
 
     ffOutput = ffInput.output('pipe:', **params)
     ffOutput.run(overwrite_output=True)
@@ -124,7 +125,7 @@ def run_1st_pass(input_file, params):
     return params
 
 
-def run_2nd_pass(input_file, output_file, params):
+def run_2nd_pass(file, output_file, params):
     """
     Run 2nd pass and create output file.
     """
@@ -138,10 +139,10 @@ def run_2nd_pass(input_file, output_file, params):
         'f' : 'webm'
     })
 
-    if isinstance(input_file, str) and input_file.startswith('concat:'):
-        ffInput = ffmpeg.input(str(input_file), format='concat', safe=0)
+    if isinstance(file, str) and file.startswith('concat:'):
+        ffInput = ffmpeg.input(str(file), format='concat', safe=0)
     else:
-        ffInput = ffmpeg.input(str(input_file))
+        ffInput = ffmpeg.input(str(file))
 
     ffOutput = ffInput.output(str(output_file), **params)
     ffOutput.run(overwrite_output=True)
@@ -181,13 +182,13 @@ def get_sorted_images(folder_path):
     return rv
 
 
-def get_frame_count(input_file):
+def get_frame_count(file):
     """
     Get frame count from file.
     """
 
     probe = ffmpeg.probe(
-        str(input_file),
+        str(file),
         v='error',
         count_frames=None,
         select_streams='v:0',
@@ -207,7 +208,7 @@ def get_frame_count(input_file):
 ## Convert
 
 def convert(
-        input_file,
+        file,
         name,
         suffix="",
         incremental_save=False,
@@ -260,34 +261,34 @@ def convert(
     _temp_files = []
 
     # Input and output
-    if not isinstance(input_file, Path):
-        input_file = Path(input_file)
+    if not isinstance(file, Path):
+        file = Path(file)
 
-    output_file = Path(f'{name}{suffix}.webm')
+    output_file = current_dir / f'{name}{suffix}.webm'
     output_frame = current_dir / f'{name}{suffix}.jpg'
 
     # Handle duplicates
     if incremental_save:
         __n = 2
 
-        while output_file.exists() or (output_file.resolve() == input_file.resolve()):
+        while output_file.exists() or (output_file.resolve() == file.resolve()):
 
             if output_file.stat().st_size == 0:
                 output_file.unlink()
                 break
 
-            output_file = Path(f'{name}{suffix}_{__n}.webm')
+            output_file = current_dir / f'{name}{suffix}_{__n}.webm'
 
             __n += 1
 
     # Handle folder with frames
-    if input_file.is_dir():
-        filenames = list(input_file.iterdir())
+    if file.is_dir():
+        filenames = list(file.iterdir())
 
         if not filenames:
-            raise Exception(f'No images found in directory: {input_file.resolve()}')
+            raise Exception(f'No images found in directory: {file.resolve()}')
 
-        sorted_images = get_sorted_images(input_file)
+        sorted_images = get_sorted_images(file)
 
         if loop:
             first_frame = sorted_images[0]
@@ -299,7 +300,7 @@ def convert(
             sorted_images.reverse()
 
         # Create a temporary file list for ffmpeg concat
-        list_file = input_file / f"{i}.txt"
+        list_file = file / f"{i}.txt"
         _temp_files.append(list_file)
 
         with open(list_file, 'w') as f:
@@ -309,7 +310,7 @@ def convert(
                 f.write(f"duration {1.0 / input_fps / speed}\n")
 
         # Use concat demuxer for image sequence
-        input_file = f'concat:{list_file}'
+        file = f'concat:{list_file}'
 
         # Save image
         save_image(sorted_images[0],
@@ -321,11 +322,11 @@ def convert(
     # Handle video file
     else:
 
-        if not input_file.exists():
-            raise Exception(f'Input file does not exist: {input_file.resolve()}')
+        if not file.exists():
+            raise Exception(f'Input file does not exist: {file.resolve()}')
 
         # Extract first frame
-        extract_frame(input_file,
+        extract_frame(file,
                       output_frame,
                       resolution=resolution,
                       qv=qv,
@@ -410,8 +411,8 @@ def convert(
         })
 
     # Run in 2 pass
-    params = run_1st_pass(input_file, params=params)
-    run_2nd_pass(input_file, output_file, params=params)
+    params = run_1st_pass(file, params=params)
+    run_2nd_pass(file, output_file, params=params)
 
     # Delete temporary files
     for f in _temp_files:
@@ -447,7 +448,6 @@ DEFAULTS = {
     }
 
 def main():
-    input_file = Path(argv[1])
     json_file = input_file / "data.json"
     preset = argv[2]
     tasks = {}
@@ -478,19 +478,19 @@ def main():
 
     if preset in ['android', 'all']:
         tasks[0] = {
-            'input_file' : input_file,
+            'file' : input_file,
             'name' : input_file.stem,
         } | { k : v[0] for k, v in params.items() }
 
     if preset in ['1080p', 'all']:
         tasks[1] = {
-            'input_file' : input_file,
+            'file' : input_file,
             'name' : input_file.stem,
         } | { k : v[1] for k, v in params.items() }
 
     if preset in ['4K', '2160p', 'all']:
         tasks[2] = {
-            'input_file' : input_file,
+            'file' : input_file,
             'name' : input_file.stem,
         } | { k : v[2] for k, v in params.items() }
 

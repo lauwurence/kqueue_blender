@@ -17,33 +17,39 @@ menu(mode="multiple" title="Pin/Unpin" image=icon.pin)
 {
 }
 
-menu(mode="multiple" title=title.more_options image=icon.more_options)
+$working_dir = 'F:\RenPy\00_Renders\kqueue_blender\webm\'
+
+menu(type='file|dir' mode="multiple" title='Convert to WebM' image='cmd.exe' pos=1)
 {
+	item(
+		title='Preset "1080p"'
+		cmd=working_dir + '.webm - 1080p.bat'
+		dir=working_dir
+		arg='@sel.path'
+		image='cmd.exe'
+		pos=0)
+
+	item(
+		title='Preset "android"'
+		cmd=working_dir + '.webm - android.bat'
+		dir=working_dir
+		arg='@sel.path'
+		image='cmd.exe'
+		pos=1)
+
+	item(
+		title='Preset "2160p"'
+		cmd=working_dir + '.webm - 2160p.bat'
+		dir=working_dir
+		arg='@sel.path'
+		image='cmd.exe'
+		pos=2)
+
+	item(
+		title='Preset "ALL"'
+		cmd=working_dir + '.webm - all.bat'
+		dir=working_dir
+		arg='@sel.path'
+		image='cmd.exe'
+		pos=3)
 }
-
-item(
-	title='Convert to WebM 1080p'
-	cmd='F:\RenPy\00_Renders\kqueue_blender\webm\.webm - 1080p.bat'
-	dir='F:\RenPy\00_Renders\kqueue_blender\webm\'
-	arg='@sel.path'
-	image='cmd.exe'
-	separator=true
-	pos=1
-	separator='before')
-
-item(
-	title='Convert to WebM android'
-	cmd='F:\RenPy\00_Renders\kqueue_blender\webm\.webm - android.bat'
-	dir='F:\RenPy\00_Renders\kqueue_blender\webm\'
-	arg='@sel.path'
-	image='cmd.exe'
-	pos=2)
-
-item(
-	title='Convert to WebM 2160p'
-	cmd='F:\RenPy\00_Renders\kqueue_blender\webm\.webm - 2160p.bat'
-	dir='F:\RenPy\00_Renders\kqueue_blender\webm\'
-	arg='@sel.path'
-	image='cmd.exe'
-	pos=3
-	separator='after')
