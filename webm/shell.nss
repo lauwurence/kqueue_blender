@@ -54,7 +54,7 @@ menu(type='file|dir' mode="multiple" title='Convert to WebM' image='cmd.exe' pos
 		pos=3)
 
 	item(
-		title='Create "settings.json"'
+		title='Create ".settings.json"'
 		cmd=working_dir + 'create_settings.bat'
 		dir=working_dir
 		arg='@sel.path'
