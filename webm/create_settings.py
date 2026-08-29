@@ -20,7 +20,7 @@ def main():
         return
 
     data = {
-        "input_fps" : 25,
+        "input_fps" : 48,
         "output_fps" : 60,
         "speed" : 1.0,
         "loop" : True,
