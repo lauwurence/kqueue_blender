@@ -19,7 +19,7 @@ menu(mode="multiple" title="Pin/Unpin" image=icon.pin)
 
 $working_dir = 'F:\RenPy\00_Renders\kqueue_blender\webm\'
 
-menu(type='file|dir' mode="multiple" title='Convert to WebM' image='cmd.exe' pos=1)
+menu(type='file|dir|back' mode="multiple" title='Convert to WebM' image='cmd.exe' pos=1)
 {
 	item(
 		title='Preset "1080p"'
