@@ -36,9 +36,9 @@ PREVIEW = False
 ## Default settings
 
 DEFAULTS = {
-    'suffix': ["#android", "", "@2"],
+    'suffix': ["@0.75", "", "@2"],
     'cv': 'libvpx-vp9',
-    'resolution': [(1920, 1080), (1920, 1080), (3840, 2160)],
+    'resolution': [(1440, 810), (1920, 1080), (3840, 2160)],
     'input_fps': 48,
     'output_fps': 60,
     'speed': 1.0,
@@ -637,7 +637,7 @@ def convert(
 
 def main():
 
-    json_file = input_file / "data.json"
+    json_file = input_file / "settings.json"
     preset = argv[2]
     params = DEFAULTS.copy()
 
@@ -718,6 +718,8 @@ def main():
             except Exception as e:
                 print(f'Conversion failed: {e}')
                 raise
+
+    winsound.Beep(frequency=840, duration=350)
 
 
 ################################################################################
