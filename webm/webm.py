@@ -637,7 +637,7 @@ def convert(
 
 def main():
 
-    json_file = input_file / "settings.json"
+    json_file = input_file / ".settings.json"
     preset = argv[2]
     params = DEFAULTS.copy()
 

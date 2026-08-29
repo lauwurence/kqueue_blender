@@ -14,7 +14,7 @@ def main():
     if not input_file.is_dir():
         return
 
-    json_file = input_file / "settings.json"
+    json_file = input_file / ".settings.json"
 
     if json_file.exists():
         return
