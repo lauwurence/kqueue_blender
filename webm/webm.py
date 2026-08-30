@@ -51,10 +51,10 @@ DEFAULTS = {
     'row_mt': [1, 1, 1],
     'tile_columns': [1, 2, 2],
     'tile_rows': [0, 0, 1],
-    'crf': [35, 20, 10],
+    'crf': [25, 15, 10],
     'qv': [4, 2, 2],
-    'image_quality': [75, 90, 95],
-    'sharpen': [0.25, 0.25, 0.0],
+    'image_quality': [80, 90, 95],
+    'sharpen': [0.6, 0.4, 0.0],
 }
 
 if PREVIEW:
@@ -65,7 +65,7 @@ if PREVIEW:
         'row_mt': 1,
         'tile_columns': 2,
         'tile_rows': 1,
-        'crf': 35,
+        'crf': 40,
     }
 
 
@@ -112,6 +112,7 @@ MINTERPOLATE = {
         'me_mode=bidir:'
         'vsbmc=1:'
         'scd=fdiff',
+
 }
 
 
@@ -337,6 +338,7 @@ def convert(
     interpolate=0,
     loop=False,
     reverse=False,
+    preset=None,
     i=None):
 
     """
@@ -595,7 +597,7 @@ def convert(
 
         # One-pass encoding
         print()
-        print(f"Encoding: {'PREVIEW' if PREVIEW else 'FINAL'}")
+        print(f"Encoding: {'PREVIEW' if PREVIEW else 'FINAL'} ({preset})")
         print("  Input FPS:     ", input_fps)
         print("  Speed:         ", speed)
         print("  Effective FPS: ", effective_fps)
@@ -710,7 +712,7 @@ def main():
     max_workers = min(1, len(tasks))
 
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = [ executor.submit(convert, i=i, **task) for i, task in tasks.items() ]
+        futures = [ executor.submit(convert, i=i, preset=preset, **task) for i, task in tasks.items() ]
 
         for future in as_completed(futures):
             try:
