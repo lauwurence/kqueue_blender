@@ -55,6 +55,7 @@ DEFAULTS = {
     'qv': [4, 2, 2],
     'image_quality': [80, 90, 95],
     'sharpen': [0.6, 0.4, 0.0],
+    'motion_blur' : None#(1, 2, 1),
 }
 
 if PREVIEW:
@@ -65,7 +66,7 @@ if PREVIEW:
         'row_mt': 1,
         'tile_columns': 2,
         'tile_rows': 1,
-        'crf': 40,
+        'crf': 15,
     }
 
 
@@ -183,7 +184,7 @@ def save_image(file, output_file, resolution=None, quality=100, sharpen=None):
         else:
             width, height = resolution
 
-        if sharpen is not None:
+        if sharpen:
             enhancer = ImageEnhance.Sharpness(img)
             img = enhancer.enhance(sharpen * 10)
 
@@ -252,7 +253,7 @@ def create_concat_file(images, list_file, frame_duration):
             f.write(f"file '{path}'\n")
 
 
-def build_filters(effective_fps, output_fps, interpolate, resolution, sharpen):
+def build_filters(effective_fps, output_fps, interpolate, resolution, sharpen, motion_blur):
     """
     Build video filter chain.
     """
@@ -260,6 +261,7 @@ def build_filters(effective_fps, output_fps, interpolate, resolution, sharpen):
     step_1 = []
     step_2 = []
     step_3 = []
+    step_4 = []
 
     # -------------------------------------------------------------------------
     # Filters
@@ -294,22 +296,33 @@ def build_filters(effective_fps, output_fps, interpolate, resolution, sharpen):
         )
 
     # -------------------------------------------------------------------------
+    # Motion Blur
+    # -------------------------------------------------------------------------
+
+    if motion_blur:
+        step_3.append(
+            'tmix='
+            f'frames={len(motion_blur)}:'
+            f'weights={" ".join(map(str, motion_blur))}'
+        )
+    # -------------------------------------------------------------------------
     # Sharpen
     # -------------------------------------------------------------------------
 
     if sharpen:
 
-        step_3.append(
+        step_4.append(
             'unsharp='
             'luma_msize_x=3:'
             'luma_msize_y=3:'
             f'luma_amount={sharpen}'
         )
 
-    if PREVIEW:
-        return step_2 + step_1 + step_3
 
-    return step_1 + step_2 + step_3
+    if PREVIEW:
+        return step_2 + step_1 + step_3 + step_4
+
+    return step_1 + step_2 + step_3 + step_4
 
 
 ################################################################################
@@ -335,6 +348,7 @@ def convert(
     qv=2,
     image_quality=90,
     sharpen=0.25,
+    motion_blur=None,
     interpolate=0,
     loop=False,
     reverse=False,
@@ -431,12 +445,16 @@ def convert(
 
     temporary_files = []
 
+    effective_fps = input_fps * speed
+    duration = len(images) / effective_fps
+    frame_duration = 1.0 / effective_fps
+    output_frame_duration = 1.0 / output_fps
+    do_loop = loop and interpolate != 0 and (effective_fps < output_fps)
+
     try:
 
         if file.is_dir():
 
-            effective_fps = input_fps * speed
-            frame_duration = 1.0 / effective_fps
             list_file = file / f'{name}_{i if i is not None else "concat"}.txt'
 
             temporary_files.append(list_file)
@@ -450,10 +468,10 @@ def convert(
             if not images:
                 raise ValueError(f'No images found in: {file.resolve()}')
 
-            if loop and interpolate != 0 and (effective_fps < output_fps):
+            if do_loop:
                 first_frame = images[0]
                 last_frame = images[-1]
-                images = images + [first_frame]
+                images = [last_frame] + images + [first_frame]
 
             if reverse:
                 images.reverse()
@@ -470,10 +488,10 @@ def convert(
             # Preview
             # -----------------------------------------------------------------
 
-            # Use the first REAL frame for preview, not the technical
-            # loop frame inserted for interpolation.
-
-            preview_frame = images[1] if loop and interpolate != 0 else images[0]
+            if do_loop:
+                preview_frame = images[1]
+            else:
+                preview_frame = images[0]
 
             save_image(
                 preview_frame,
@@ -500,8 +518,6 @@ def convert(
                 sharpen=sharpen,
             )
 
-            effective_fps = input_fps * speed
-
         # ---------------------------------------------------------------------
         # Build filters
         # ---------------------------------------------------------------------
@@ -512,7 +528,13 @@ def convert(
             interpolate=interpolate,
             resolution=resolution,
             sharpen=sharpen,
+            motion_blur=motion_blur
         )
+
+        if do_loop:
+            filters.append(
+                f'trim=start={output_frame_duration:.12f}:end={duration - output_frame_duration:.12f}'
+            )
 
         # ---------------------------------------------------------------------
         # VP9 parameters
