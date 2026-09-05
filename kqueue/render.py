@@ -209,6 +209,12 @@ blender --background "{project.file}" --scene "{sc}" -E "{'CYCLES' if not preset
         if not preset.is_status('RENDERING_STOPPING'):
             preset.set_status('RENDERING_FINISHED')
 
+        if self.listen_thread and self.listen_thread.isRunning():
+            self.listen_thread.wait(1000)
+
+        if self.timer_thread and self.timer_thread.isRunning():
+            self.timer_thread.wait(1000)
+
         self.finished.emit()
 
 
