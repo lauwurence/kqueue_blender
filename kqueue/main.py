@@ -5,11 +5,11 @@ import os
 import ctypes
 import subprocess
 
-import PyQt5.QtWidgets as qtw
-import PyQt5.QtGui as qtg
-import PyQt5.QtCore as qtc
-import PyQt5.QtSvg as qts
-from PyQt5.QtCore import Qt
+import PyQt6.QtWidgets as qtw
+import PyQt6.QtGui as qtg
+import PyQt6.QtCore as qtc
+import PyQt6.QtSvgWidgets as qts
+from PyQt6.QtCore import Qt
 
 from os import getcwd, makedirs
 from sys import exit
@@ -30,14 +30,9 @@ from .widgets.QPushButton import QPushButton
 from .widgets.QComboBox import QComboBox
 from .widgets.QProgressBar import QProgressBar
 
-if hasattr(Qt, 'AA_EnableHighDpiScaling'):
-    qtw.QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-
-if hasattr(Qt, 'AA_UseHighDpiPixmaps'):
-    qtw.QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
 active_monitor = monitor.get_primary_display_info()
-factor = 1.0 + ((2160 / active_monitor.height) - 1.0) * 0.5
+factor = 1.15 + ((2160 / active_monitor.height) - 1.0) * 0.5
 
 if DEV_MODE:
     print(f'Monitor: {active_monitor.width}x{active_monitor.height} | Scale: {factor}')
@@ -160,7 +155,6 @@ class QueuePreset():
             raise Exception(f'Unknown status "{value}".')
 
         self.blender_status = value
-        # if gui: log(f'Status: {self.blender_status}', developer=True)
 
 
     def is_status(self, *values):
@@ -181,7 +175,12 @@ class QueuePreset():
         Locate Blender executable file.
         """
 
-        filename, _ = qtw.QFileDialog.getOpenFileName(mw, 'Single File', "H:/Blender Foundation/", 'blender.exe')
+        filename, _ = qtw.QFileDialog.getOpenFileName(
+            mw,
+            'Single File',
+            "H:/Blender Foundation/",
+            'blender.exe'
+        )
 
         if not filename:
             return
@@ -221,7 +220,11 @@ class QueuePreset():
         if not filename:
             return
 
-        save_load.save_project_file([self.project_list, self.blender_exe], filename, version=1)
+        save_load.save_project_file(
+            [self.project_list, self.blender_exe],
+            filename,
+            version=1
+        )
 
         self.set_save(filename)
         self.set_need_save(False)
@@ -240,12 +243,21 @@ class QueuePreset():
             path = pathutils.join(store.working_dir, SAVE_FOLDER)
             makedirs(path, exist_ok=True)
 
-        filename, _ = qtw.QFileDialog.getSaveFileName(mw, 'Save', path, "kQueue Project (*.kqp)")
+        filename, _ = qtw.QFileDialog.getSaveFileName(
+            mw,
+            'Save',
+            path,
+            "kQueue Project (*.kqp)"
+        )
 
         if not filename:
             return
 
-        save_load.save_project_file([self.project_list, self.blender_exe], filename, version=1)
+        save_load.save_project_file(
+            [ self.project_list, self.blender_exe ],
+            filename,
+            version=1
+        )
 
         self.set_save(filename)
         self.set_need_save(False)
@@ -266,7 +278,12 @@ class QueuePreset():
                 path = pathutils.join(store.working_dir, SAVE_FOLDER)
                 makedirs(path, exist_ok=True)
 
-            filename, _ = qtw.QFileDialog.getOpenFileName(mw, 'Load', path, "kQueue Project (*.kqp)")
+            filename, _ = qtw.QFileDialog.getOpenFileName(
+                mw,
+                'Load',
+                path,
+                "kQueue Project (*.kqp)"
+            )
 
             if not filename:
                 return
@@ -389,15 +406,9 @@ class QueuePreset():
 
         self.init_render_variables(gui=True)
 
-        self.render_thread = RenderThread() #qtc.QThread()
-        # self.render_worker = RenderThread()
-        # self.render_worker.moveToThread(self.render_thread)
+        self.render_thread = RenderThread()
 
-        # self.render_thread.started.connect(self.render_worker.run)
         self.render_thread.finished.connect(self.render_thread.deleteLater)
-
-        # self.render_worker.finished.connect(self.render_thread.quit)
-        # self.render_worker.finished.connect(self.render_worker.deleteLater)
 
         self.render_thread.start()
 
@@ -495,7 +506,7 @@ class QListWidget(qtw.QListWidget):
 
     def dragMoveEvent(self, event):
 
-        if ((target := self.row(self.itemAt(event.pos()))) ==
+        if ((target := self.row(self.itemAt(event.position().toPoint()))) ==
             (current := self.currentRow()) + 1 or
             (current == self.count() - 1 and target == -1)):
             event.ignore()
@@ -531,7 +542,7 @@ def set_window_titlebar_dark(window):
                 ctypes.sizeof(value)
             )
 
-    except Exception as e:
+    except Exception:
         pass
 
 
@@ -549,10 +560,10 @@ class MainWindow(qtw.QMainWindow):
 
         self.setWindowIcon(qtg.QIcon(ICON))
 
-        self.setMinimumWidth(1100)
-        self.setMinimumHeight(600)
+        self.setMinimumWidth(1200)
+        self.setMinimumHeight(700)
         self.setAcceptDrops(True)
-        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
 
         # [widget]
         w = qtw.QWidget()
@@ -569,7 +580,7 @@ class MainWindow(qtw.QMainWindow):
             w_vBoxLayout.addLayout(w_hBoxLayout)
 
             # [button] Locate Save
-            self.projectSave = QPushButton("", clicked=lambda: preset.save_as())
+            self.projectSave = QPushButton("", clicked=lambda: preset.save())
             self.projectSave.setFixedHeight(26)
             self.projectSave.setIcon(qtg.QIcon('kqueue/icons/save.svg'))
             self.projectSave.setIconSize(qtc.QSize(18, 18))
@@ -579,7 +590,10 @@ class MainWindow(qtw.QMainWindow):
             w_hBoxLayout.addWidget(self.projectSave)
 
             # [shortcut] Save
-            qtw.QShortcut('Ctrl+S', self).activated.connect(lambda: preset.save())
+            qtg.QShortcut(
+                qtg.QKeySequence('Ctrl+S'),
+                self
+            ).activated.connect(lambda: preset.save())
 
             # [button] Load
             self.projectLoad = QPushButton("", clicked=lambda: preset.load_from())
@@ -606,7 +620,10 @@ class MainWindow(qtw.QMainWindow):
             w_hBoxLayout.addWidget(w_pathToBlender)
 
             # [button] Locate Blender
-            self.w_locateBlender = w_locateBlender = QPushButton("", clicked=lambda: preset.locate_blender())
+            self.w_locateBlender = w_locateBlender = QPushButton(
+                "",
+                clicked=lambda: preset.locate_blender()
+            )
             w_locateBlender.clicked.connect(lambda: self.update_widgets.emit())
             w_locateBlender.setIcon(qtg.QIcon('kqueue/icons/blender.svg'))
             w_locateBlender.setIconSize(qtc.QSize(18, 18))
@@ -621,12 +638,20 @@ class MainWindow(qtw.QMainWindow):
 
         self.w_listOfProjects = w_listOfProjects = QListWidget()
         w_listOfProjects.itemDoubleClicked.connect(open_project_settings)
-        w_listOfProjects.setDragDropMode(qtw.QAbstractItemView.InternalMove)
-        w_listOfProjects.model().rowsMoved.connect(lambda: self.update_list.emit(True))
+
+        w_listOfProjects.setDragDropMode(
+            qtw.QAbstractItemView.DragDropMode.InternalMove
+        )
+
+        w_listOfProjects.model().rowsMoved.connect(
+            lambda: self.update_list.emit(True)
+        )
+
         w_vBoxLayout.addWidget(w_listOfProjects)
 
         # [hbox]
         w_hBoxLayout = qtw.QHBoxLayout()
+        w_hBoxLayout.setSpacing(10)
         w_vBoxLayout.addLayout(w_hBoxLayout)
 
         # [check] Global active
@@ -653,12 +678,40 @@ class MainWindow(qtw.QMainWindow):
             store.preset.set_need_save()
 
         self.w_global_active.clicked.connect(toggle_global_active)
-        self.w_global_active.setStyleSheet("""
-            QCheckBox::indicator {
-                width: 12;
-                height: 12;
-            }
-        """)
+
+        # [check] Preview Render
+        self.w_preview_render = w_preview_render = qtw.QCheckBox("Preview Render")
+        w_hBoxLayout.addWidget(w_preview_render)
+
+        def toggle_preview_render():
+            preset.preview_render = w_preview_render.isChecked()
+            self.update_list.emit(False)
+
+        w_preview_render.clicked.connect(lambda: toggle_preview_render())
+
+        # [check] Selective Render
+        self.w_selective = w_selective = qtw.QCheckBox("Selective Render")
+        w_hBoxLayout.addWidget(w_selective)
+
+        def toggle_selective():
+            preset.selective_render = w_selective.isChecked()
+            self.update_list.emit(False)
+            self.update_widgets.emit()
+
+        w_selective.clicked.connect(lambda: toggle_selective())
+
+        # [check] Marker Render
+        self.w_marker_render = w_marker_render = qtw.QCheckBox("Marker Render")
+        w_hBoxLayout.addWidget(w_marker_render)
+
+        def toggle_marker_render():
+            preset.marker_render = w_marker_render.isChecked()
+            self.update_list.emit(False)
+
+        w_marker_render.clicked.connect(lambda: toggle_marker_render())
+
+        w_hBoxLayout.addStretch()
+
 
         l_form = qtw.QFormLayout()
         w_hBoxLayout.addLayout(l_form)
@@ -693,17 +746,31 @@ class MainWindow(qtw.QMainWindow):
 
         self.w_setGlobalSamples_list = []
 
-        for sample in [ 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 ]:
-            w_setGlobalSamples = QPushButton(f'{sample}', clicked=toggle_global_active(sample))
+        for sample in [16, 32, 64, 128, 256, 512, 1024, 2048, 4096]:
+            w_setGlobalSamples = QPushButton(
+                f'{sample}',
+                clicked=toggle_global_active(sample)
+            )
+
             w_setGlobalSamples.setFixedSize(48, 24)
-            w_setGlobalSamples.setToolTip(f'Set {sample} samples for active projects.')
+            w_setGlobalSamples.setToolTip(
+                f'Set {sample} samples for active projects.'
+            )
+
             w_hBoxLayout.addWidget(w_setGlobalSamples)
 
             self.w_setGlobalSamples_list.append(w_setGlobalSamples)
 
         # [button] Reload
-        self.w_global_reload = QPushButton("", clicked=lambda: preset.reload_projects())
-        self.w_global_reload.setIcon(qtg.QIcon('kqueue/icons/reload_project.svg'))
+        self.w_global_reload = QPushButton(
+            "",
+            clicked=lambda: preset.reload_projects()
+        )
+
+        self.w_global_reload.setIcon(
+            qtg.QIcon('kqueue/icons/reload_project.svg')
+        )
+
         self.w_global_reload.setIconSize(qtc.QSize(17, 17))
         self.w_global_reload.setFixedSize(32, 24)
         self.w_global_reload.setToolTip("Reload all projects.")
@@ -716,8 +783,9 @@ class MainWindow(qtw.QMainWindow):
         if True:
 
             # [label] Status
-            self.w_logStatus = QSvgWidget("kqueue/icons/status_loading.svg")
+            self.w_logStatus = QSvgWidget()
             self.w_logStatus.setFixedSize(16, 16)
+            self.w_logStatus.setImage("kqueue/icons/status_loading.svg")
             w_hBoxLayout.addWidget(self.w_logStatus)
 
             # [label] Output
@@ -725,7 +793,6 @@ class MainWindow(qtw.QMainWindow):
             self.w_logOutput.setFixedHeight(40)
             self.w_logOutput.setEnabled(False)
             w_hBoxLayout.addWidget(self.w_logOutput)
-
 
         # [hbox]
         w_hBoxLayout = qtw.QHBoxLayout()
@@ -742,9 +809,7 @@ class MainWindow(qtw.QMainWindow):
             self.w_gProgressBar.setRange(0, 100)
             self.w_gProgressBar.setValue(0)
             self.w_gProgressBar.setFixedHeight(20)
-            # w_gProgressBar.setTextVisible(False)
             w_hBoxLayout.addWidget(self.w_gProgressBar)
-
 
             # [hbox]
             hbox = qtw.QHBoxLayout()
@@ -761,7 +826,6 @@ class MainWindow(qtw.QMainWindow):
             self.w_pProgressBar.setFixedHeight(10)
             self.w_pProgressBar.setTextVisible(False)
             hbox.addWidget(self.w_pProgressBar)
-
 
             # [hbox]
             hbox = qtw.QHBoxLayout()
@@ -784,7 +848,6 @@ class MainWindow(qtw.QMainWindow):
                 }
             """)
 
-
             # [hbox]
             hbox = qtw.QHBoxLayout()
             w_vBoxLayout.addLayout(hbox)
@@ -795,50 +858,11 @@ class MainWindow(qtw.QMainWindow):
 
             # [label] GPU Monitor
             self.w_gGPUMonitor = qtw.QLabel()
-            hbox.addWidget(self.w_gGPUMonitor, 2, Qt.AlignRight)
-
-
-        # [check] Preview Render
-        self.w_preview_render = w_preview_render = qtw.QCheckBox("Preview Render")
-        w_vBoxLayout.addWidget(w_preview_render)
-
-        def toggle_preview_render():
-            preset.preview_render = w_preview_render.isChecked()
-            self.update_list.emit(False)
-
-        w_preview_render.clicked.connect(lambda: toggle_preview_render())
-
-        # [check] Selective Render
-        self.w_selective = w_selective = qtw.QCheckBox("Selective Render")
-        w_vBoxLayout.addWidget(w_selective)
-
-        def toggle_selective():
-            preset.selective_render = w_selective.isChecked()
-            self.update_list.emit(False)
-            self.update_widgets.emit()
-
-        w_selective.clicked.connect(lambda: toggle_selective())
-
-        # [check] Marker Render
-        self.w_marker_render = w_marker_render = qtw.QCheckBox("Marker Render")
-        w_vBoxLayout.addWidget(w_marker_render)
-
-        def toggle_marker_render():
-            preset.marker_render = w_marker_render.isChecked()
-            self.update_list.emit(False)
-
-        w_marker_render.clicked.connect(lambda: toggle_marker_render())
-
-        # [check] Assign sRGB
-        # self.w_assign_srgb = w_assign_srgb = qtw.QCheckBox("Save as sRGB")
-        # w_vBoxLayout.addWidget(w_assign_srgb)
-
-        # def toggle_assign_srgb():
-        #     preset.assign_srgb = w_assign_srgb.isChecked()
-        #     self.update_list.emit(False)
-
-        # w_assign_srgb.clicked.connect(lambda: toggle_assign_srgb())
-
+            hbox.addWidget(
+                self.w_gGPUMonitor,
+                2,
+                Qt.AlignmentFlag.AlignRight
+            )
 
         # ! [hbox] Start and Stop Render
         w_hBoxLayout = qtw.QHBoxLayout()
@@ -861,22 +885,30 @@ class MainWindow(qtw.QMainWindow):
         w_onComplete.setCurrentText('NONE')
         w_hBoxLayoutOnComplete.addWidget(w_onComplete)
 
-        # # [button] Shutdown
-        # w_shutdown = QPushButton("Shutdown", clicked=lambda: preset.shutdown())
-        # w_hBoxLayoutOnComplete.addWidget(w_shutdown)
-
         # [button] Cancel Shutdown
-        self.w_cancelShutdown = w_cancelShutdown = QPushButton("Cancel", clicked=lambda: preset.cancel_shutdown())
+        self.w_cancelShutdown = w_cancelShutdown = QPushButton(
+            "Cancel",
+            clicked=lambda: preset.cancel_shutdown()
+        )
+
         w_cancelShutdown.setFixedHeight(25)
         w_cancelShutdown.setEnabled(False)
-        w_hBoxLayoutOnComplete.addWidget(w_cancelShutdown, 2, Qt.AlignLeft)
+        w_hBoxLayoutOnComplete.addWidget(
+            w_cancelShutdown,
+            2,
+            Qt.AlignmentFlag.AlignLeft
+        )
 
         # ! [hbox] Start & Stop
         w_hBoxLayoutRender = qtw.QHBoxLayout()
         w_hBoxLayout.addLayout(w_hBoxLayoutRender)
 
         # [button] Start Render
-        self.w_startRender = w_startRender = QPushButton("", clicked=lambda: preset.start_render())
+        self.w_startRender = w_startRender = QPushButton(
+            "",
+            clicked=lambda: preset.start_render()
+        )
+
         w_startRender.setIcon(qtg.QIcon('kqueue/icons/play.svg'))
         w_startRender.setToolTip("Start rendering.")
         w_startRender.setFixedWidth(100)
@@ -885,13 +917,22 @@ class MainWindow(qtw.QMainWindow):
         w_hBoxLayoutRender.addWidget(w_startRender)
 
         # [button] Stop Render
-        self.w_stopRender = w_stopRender = QPushButton("", clicked=lambda: preset.stop_render())
+        self.w_stopRender = w_stopRender = QPushButton(
+            "",
+            clicked=lambda: preset.stop_render()
+        )
+
         w_stopRender.setIcon(qtg.QIcon('kqueue/icons/stop.svg'))
         w_stopRender.setToolTip("Stop rendering.")
         w_stopRender.setFixedWidth(100)
         w_stopRender.setFixedHeight(40)
         w_stopRender.setEnabled(False)
-        w_hBoxLayoutRender.addWidget(w_stopRender, 1, Qt.AlignLeft)
+
+        w_hBoxLayoutRender.addWidget(
+            w_stopRender,
+            1,
+            Qt.AlignmentFlag.AlignLeft
+        )
 
         w_hBoxLayout.addSpacing(10)
 
@@ -903,8 +944,15 @@ class MainWindow(qtw.QMainWindow):
 
             pathutils.open_image(preset.renders_list[-1])
 
-        self.w_openRender = w_openRender = QPushButton("", clicked=lambda: open_render())
-        w_openRender.setIcon(qtg.QIcon('kqueue/icons/open_render.svg'))
+        self.w_openRender = w_openRender = QPushButton(
+            "",
+            clicked=lambda: open_render()
+        )
+
+        w_openRender.setIcon(
+            qtg.QIcon('kqueue/icons/open_render.svg')
+        )
+
         w_openRender.setToolTip("Open last saved render.")
         w_openRender.setFixedWidth(40)
         w_openRender.setFixedHeight(40)
@@ -918,16 +966,30 @@ class MainWindow(qtw.QMainWindow):
 
             pathutils.open_folder(preset.renders_list[-1])
 
-        self.w_openRenderFolder = w_openRenderFolder = QPushButton("", clicked=lambda: open_render_folder())
-        w_openRenderFolder.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
+        self.w_openRenderFolder = w_openRenderFolder = QPushButton(
+            "",
+            clicked=lambda: open_render_folder()
+        )
+
+        w_openRenderFolder.setIcon(
+            qtg.QIcon('kqueue/icons/folder.svg')
+        )
+
         w_openRenderFolder.setToolTip("Open last saved render folder.")
         w_openRenderFolder.setFixedWidth(40)
         w_openRenderFolder.setFixedHeight(40)
         w_hBoxLayout.addWidget(w_openRenderFolder)
 
         # [button] Screens Off
-        w_screensOff = QPushButton("", clicked=lambda: monitor.screen_off(delay=1.0))
-        w_screensOff.setIcon(qtg.QIcon('kqueue/icons/screen_off.svg'))
+        w_screensOff = QPushButton(
+            "",
+            clicked=lambda: monitor.screen_off(delay=1.0)
+        )
+
+        w_screensOff.setIcon(
+            qtg.QIcon('kqueue/icons/screen_off.svg')
+        )
+
         w_screensOff.setToolTip("Turn off the screens.")
         w_screensOff.setFixedWidth(40)
         w_screensOff.setFixedHeight(40)
@@ -964,15 +1026,17 @@ class MainWindow(qtw.QMainWindow):
             return
 
         # Delete
-        if event.key() == Qt.Key_Delete:
+        if event.key() == Qt.Key.Key_Delete:
 
             if preset.project_list:
                 project = self.get_selected_project()
-                preset.project_list.remove(project)
 
-                self.update_list.emit(False)
-                self.update_widgets.emit()
-                preset.set_need_save()
+                if project:
+                    preset.project_list.remove(project)
+
+                    self.update_list.emit(False)
+                    self.update_widgets.emit()
+                    preset.set_need_save()
 
 
     def get_selected_project(self):
@@ -990,7 +1054,11 @@ class MainWindow(qtw.QMainWindow):
         Load projects on drag and drop.
         """
 
-        files = [ url.toLocalFile() for url in event.mimeData().urls() ]
+        files = [
+            url.toLocalFile()
+            for url in event.mimeData().urls()
+        ]
+
         preset.add_projects(*files)
 
 
@@ -1005,13 +1073,17 @@ class MainWindow(qtw.QMainWindow):
             event.accept()
 
         else:
-            result = qtw.QMessageBox.question(self,
-                        "Confirm Exit",
-                        "Are you sure you want to exit?",
-                        qtw.QMessageBox.Yes| qtw.QMessageBox.No)
+            result = qtw.QMessageBox.question(
+                self,
+                "Confirm Exit",
+                "Are you sure you want to exit?",
+                qtw.QMessageBox.StandardButton.Yes |
+                qtw.QMessageBox.StandardButton.No
+            )
+
             event.ignore()
 
-            if result == qtw.QMessageBox.Yes:
+            if result == qtw.QMessageBox.StandardButton.Yes:
                 preset.stop_render()
                 event.accept()
 
@@ -1045,13 +1117,25 @@ class MainWindow(qtw.QMainWindow):
         self.setWindowTitle(title)
 
 
+    def stop_thumbnail_thread(self):
+        """
+        """
+
+        for i in range(self.w_listOfProjects.count()):
+            item = self.w_listOfProjects.item(i)
+            w_project = self.w_listOfProjects.itemWidget(item)
+            w_project.stop_thumbnail_thread()
+
+
     def __update_list(self, sync=False):
         """
         Update list widget and `preset.project_list` list.
         """
 
+        self.stop_thumbnail_thread()
+
         old_value = self.w_listOfProjects.verticalScrollBar().value()
-        old_files = [ p.file for p in preset.project_list ]
+        old_files = [p.file for p in preset.project_list]
 
         # Sync variable with the list widget
         if sync:
@@ -1110,41 +1194,55 @@ class MainWindow(qtw.QMainWindow):
                 project_frames = frames
 
         global_frames = preset.get_global_frames_number()
-        self.w_gProgress.setText(f'0/{global_frames or 0}' if global_frames or preset.project_list else "Global:")
-        self.w_pProgress.setText(f'0/{project_frames or 0}' if project_frames or preset.project_list else "Project:")
+
+        self.w_gProgress.setText(
+            f'0/{global_frames or 0}'
+            if global_frames or preset.project_list
+            else "Global:"
+        )
+
+        self.w_pProgress.setText(
+            f'0/{project_frames or 0}'
+            if project_frames or preset.project_list
+            else "Project:"
+        )
 
         self.w_gProgressBar.setValue(0)
         self.w_pProgressBar.setValue(0)
         self.w_rProgressBar.setValue(0)
 
         # If list changed
-        new_files = [ p.file for p in preset.project_list ]
+        new_files = [p.file for p in preset.project_list]
 
         if old_files != new_files:
             preset.set_need_save()
 
         max_cycles = 1000
 
-        while self.w_listOfProjects.verticalScrollBar().value() != old_value and max_cycles > 0:
+        while (
+            self.w_listOfProjects.verticalScrollBar().value() != old_value
+            and max_cycles > 0
+        ):
             self.w_listOfProjects.verticalScrollBar().setValue(old_value)
-
             max_cycles -= 1
 
 
     def __update_widgets(self):
 
-        if preset.is_status('RENDERING') or preset.is_status('RENDERING_STOPPING'):
+        if preset.is_status('RENDERING', 'RENDERING_STOPPING'):
             self.projectSave.setEnabled(False)
             self.projectLoad.setEnabled(False)
             self.projectReload.setEnabled(False)
             self.w_locateBlender.setEnabled(False)
             self.w_selective.setEnabled(False)
-            # self.w_assign_srgb.setEnabled(False)
             self.w_preview_render.setEnabled(False)
             self.w_marker_render.setEnabled(False)
             self.w_global_reload.setEnabled(False)
 
-            self.w_logStatus.setImage("kqueue/icons/status_loading.svg")
+            self.w_logStatus.setImage(
+                "kqueue/icons/status_loading.svg"
+            )
+
             self.w_global_active.setEnabled(False)
 
             for widget in self.w_setGlobalSamples_list:
@@ -1156,31 +1254,70 @@ class MainWindow(qtw.QMainWindow):
             self.projectReload.setEnabled(True)
             self.w_locateBlender.setEnabled(True)
             self.w_selective.setEnabled(True)
-            # self.w_assign_srgb.setEnabled(True)
             self.w_preview_render.setEnabled(True)
             self.w_marker_render.setEnabled(True)
-            self.w_global_reload.setEnabled(preset.has_outdated_projects())
+            self.w_global_reload.setEnabled(
+                preset.has_outdated_projects()
+            )
 
             if preset.is_adding_projects:
-                self.w_logStatus.setImage("kqueue/icons/status_loading.svg")
+                self.w_logStatus.setImage(
+                    "kqueue/icons/status_loading.svg"
+                )
             else:
-                self.w_logStatus.setImage("kqueue/icons/status_idle.svg")
+                self.w_logStatus.setImage(
+                    "kqueue/icons/status_idle.svg"
+                )
 
             self.w_global_active.setEnabled(True)
 
             for widget in self.w_setGlobalSamples_list:
                 widget.setEnabled(bool(preset.project_list))
 
-        self.w_startRender.setEnabled(bool(preset.blender_exe and not preset.is_status('RENDERING') and preset.project_list and preset.get_global_frames_number()))
-        self.w_stopRender.setEnabled(preset.is_status('RENDERING') and not preset.is_status('RENDERING_STOPPING'))
-        self.w_listOfProjects.setEnabled(bool(not preset.is_adding_projects and not preset.is_status('RENDERING')))
-        self.w_cancelShutdown.setEnabled(bool(preset.is_shutting_down))
-        self.w_openRender.setEnabled(bool(preset.renders_list))
-        self.w_openRenderFolder.setEnabled(bool(preset.renders_list))
+        self.w_startRender.setEnabled(
+            bool(
+                preset.blender_exe
+                and not preset.is_status('RENDERING')
+                and preset.project_list
+                and preset.get_global_frames_number()
+            )
+        )
 
-        self.w_selective.setChecked(bool(preset.selective_render))
-        # self.w_assign_srgb.setChecked(bool(preset.assign_srgb))
-        self.w_preview_render.setChecked(bool(preset.preview_render))
+        self.w_stopRender.setEnabled(
+            preset.is_status('RENDERING')
+            and not preset.is_status('RENDERING_STOPPING')
+        )
+
+        self.w_listOfProjects.setEnabled(
+            bool(
+                not preset.is_adding_projects
+                and not preset.is_status('RENDERING')
+            )
+        )
+
+        self.w_cancelShutdown.setEnabled(
+            bool(preset.is_shutting_down)
+        )
+
+        self.w_openRender.setEnabled(
+            bool(preset.renders_list)
+        )
+
+        self.w_openRenderFolder.setEnabled(
+            bool(preset.renders_list)
+        )
+
+        self.w_selective.setChecked(
+            bool(preset.selective_render)
+        )
+
+        self.w_preview_render.setChecked(
+            bool(preset.preview_render)
+        )
+
+        self.w_marker_render.setChecked(
+            bool(preset.marker_render)
+        )
 
         for i in range(self.w_listOfProjects.count()):
             item = self.w_listOfProjects.item(i)
@@ -1208,12 +1345,18 @@ class MainWindow(qtw.QMainWindow):
             if (used_gb > total_gb * 0.9) or temper > 70:
                 self.w_gGPUMonitor.setStyleSheet("color: red;")
             else:
-                self.w_gGPUMonitor.setStyleSheet("color: #4a4a4a;")
+                self.w_gGPUMonitor.setStyleSheet(
+                    "color: #4a4a4a;"
+                )
 
             if preset and preset.is_status('RENDERING'):
 
                 if temper > 80:
-                    tt = f'The GPU temperature is critically high: {temper}°C'
+                    tt = (
+                        f'The GPU temperature is critically high: '
+                        f'{temper}°C'
+                    )
+
                     preset.render_thread.listen_thread.exit_message = tt
                     preset.stop_render()
 
@@ -1260,7 +1403,11 @@ def log(*args, developer=False, write=True, open_file=False):
         while retries > 0:
 
             try:
-                with open(store.crash_file, 'a', encoding='utf-8') as f:
+                with open(
+                    store.crash_file,
+                    'a',
+                    encoding='utf-8'
+                ) as f:
                     f.write(f"\n{line}")
 
                 done = True
@@ -1280,7 +1427,9 @@ def log(*args, developer=False, write=True, open_file=False):
 ################################################################################
 
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APPID)
+
 store.app = app = qtw.QApplication([])
+
 store.mw = mw = MainWindow()
 store.preset = preset = QueuePreset()
 
@@ -1689,7 +1838,6 @@ def __start_periodic(interval=1.0):
 ############################################################################
 # Run
 
-
 def main():
 
     try:
@@ -1704,7 +1852,7 @@ def main():
             preset.load_from(last_project_filename)
 
         mw.show()
-        exit(app.exec_())
+        exit(app.exec())
 
     except Exception as e:
         log(f'Critical Exception: {e}', open_file=True)

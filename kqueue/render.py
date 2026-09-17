@@ -3,7 +3,7 @@
 
 import time
 import subprocess
-import PyQt5.QtCore as qtc
+import PyQt6.QtCore as qtc
 
 from re import search
 from io import TextIOWrapper
@@ -24,6 +24,8 @@ class RenderThread(qtc.QThread):
 
     def __init__(self):
         super().__init__()
+
+        self.setObjectName("RenderThread")
 
 
     def run(self):
@@ -54,7 +56,8 @@ class RenderThread(qtc.QThread):
             PYTHON = f"""
 import bpy
 
-scene = bpy.context.scene
+context = bpy.context
+scene = context.scene
 cycles = scene.cycles
 render = scene.render
 image_settings = render.image_settings
@@ -63,6 +66,12 @@ shading = scene.display.shading
 # Scene
 if "{ca}" in bpy.data.objects:
     scene.camera = bpy.data.objects["{ca}"]
+
+# Deselect objects
+for object in context.selected_objects:
+    object.select_set(False)
+
+context.view_layer.objects.active = None
 
 render.filepath = "{project.get_render_filepath().replace('\\', '/')}"
 render.use_overwrite = True
@@ -227,6 +236,9 @@ class RenderTimerThread(qtc.QThread):
     def __init__(self):
         super().__init__()
 
+        self.setObjectName("RenderTimerThread")
+
+
     def run(self):
         preset = store.preset
 
@@ -295,6 +307,8 @@ class RenderListenThread(qtc.QThread):
 
     def __init__(self):
         super().__init__()
+
+        self.setObjectName("RenderListenThread")
 
         self.exit_message = None
 

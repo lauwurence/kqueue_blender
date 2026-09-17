@@ -1,8 +1,8 @@
 ################################################################################
 ##
 
-import PyQt5.QtWidgets as qtw
-import PyQt5.QtCore as qtc
+import PyQt6.QtWidgets as qtw
+import PyQt6.QtCore as qtc
 
 class QProgressBar(qtw.QProgressBar):
 
@@ -24,5 +24,5 @@ class QProgressBar(qtw.QProgressBar):
         self.animation.setDuration(duration)
         self.animation.setStartValue(self.value())
         self.animation.setEndValue(value)
-        self.animation.setEasingCurve(qtc.QEasingCurve.OutCubic)
+        self.animation.setEasingCurve(qtc.QEasingCurve.Type.OutCubic)
         self.animation.start()

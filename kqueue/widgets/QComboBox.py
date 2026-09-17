@@ -1,7 +1,7 @@
 ################################################################################
 ## QComboBox
 
-import PyQt5.QtWidgets as qtw
+import PyQt6.QtWidgets as qtw
 
 class QComboBox(qtw.QComboBox):
 

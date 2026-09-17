@@ -1,9 +1,9 @@
 ################################################################################
 ## QPushButton
 
-import PyQt5.QtWidgets as qtw
-import PyQt5.QtGui as qtg
-from PyQt5.QtCore import Qt
+import PyQt6.QtWidgets as qtw
+import PyQt6.QtGui as qtg
+from PyQt6.QtCore import Qt
 
 class DisabledIconEngine(qtg.QIconEngine):
 
@@ -22,7 +22,7 @@ class DisabledIconEngine(qtg.QIconEngine):
 
         painter.save()
         painter.setOpacity(self.opacity)
-        self.base_icon.paint(painter, rect, Qt.AlignCenter, mode, state)
+        self.base_icon.paint(painter, rect, Qt.AlignmentFlag.AlignCenter, mode, state)
         painter.restore()
 
     def pixmap(self, size, mode, state):
@@ -35,7 +35,7 @@ class DisabledIconEngine(qtg.QIconEngine):
             return qtg.QPixmap()
 
         result = qtg.QPixmap(size)
-        result.fill(Qt.transparent)
+        result.fill(Qt.GlobalColor.transparent)
 
         painter = qtg.QPainter(result)
         painter.setOpacity(self.opacity)
@@ -71,7 +71,7 @@ class QPushButton(qtw.QPushButton):
 
     def changeEvent(self, event):
 
-        if event.type() == event.EnabledChange:
+        if event.type() == event.Type.EnabledChange:
             self._update_icon()
 
         super().changeEvent(event)

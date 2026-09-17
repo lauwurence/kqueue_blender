@@ -1,10 +1,10 @@
 ################################################################################
 ## Project Widgets
 
-import PyQt5.QtWidgets as qtw
-import PyQt5.QtGui as qtg
-import PyQt5.QtCore as qtc
-from PyQt5.QtCore import Qt
+import PyQt6.QtWidgets as qtw
+import PyQt6.QtGui as qtg
+import PyQt6.QtCore as qtc
+from PyQt6.QtCore import Qt
 
 from ..widgets.QPushButton import QPushButton
 from ..widgets.QComboBox import QComboBox
@@ -14,6 +14,36 @@ from .. import store
 
 from pathlib import Path
 
+class ThumbnailWorker(qtc.QObject):
+    finished = qtc.pyqtSignal(str, qtg.QImage)
+
+    def __init__(self, filename, size=60, parent=None):
+        super().__init__(parent)
+        self.filename = str(filename)
+        self.size = size
+
+    @qtc.pyqtSlot()
+    def run(self):
+        reader = qtg.QImageReader(self.filename)
+
+        if not reader.canRead():
+            self.finished.emit(self.filename, qtg.QImage())
+            return
+
+        original_size = reader.size()
+
+        if original_size.isValid():
+            target_size = original_size
+            target_size.scale(
+                self.size,
+                self.size,
+                Qt.AspectRatioMode.KeepAspectRatio
+            )
+            reader.setScaledSize(target_size)
+
+        image = reader.read()
+
+        self.finished.emit(self.filename, image)
 
 ################################################################################
 ## Project Item Widget
@@ -26,6 +56,11 @@ class QBlendProject(qtw.QWidget):
 
         self.project = project
 
+        # Thumbnail worker
+        self._thumbnail_thread = None
+        self._thumbnail_worker = None
+        self._thumbnail_path = None
+
         # [hbox]
         self.w_hBoxLayout = qtw.QHBoxLayout()
         self.setLayout(self.w_hBoxLayout)
@@ -34,8 +69,8 @@ class QBlendProject(qtw.QWidget):
 
             # [frame} Separator
             separator = qtw.QFrame()
-            separator.setFrameShape(qtw.QFrame.VLine)
-            separator.setFrameShadow(qtw.QFrame.Plain)
+            separator.setFrameShape(qtw.QFrame.Shape.VLine)
+            separator.setFrameShadow(qtw.QFrame.Shadow.Plain)
             separator.setStyleSheet("""
                 QFrame {
                     background-color: #4a4a4a;
@@ -60,8 +95,8 @@ class QBlendProject(qtw.QWidget):
         self.w_active.clicked.connect(lambda: toggle_active())
         self.w_active.setStyleSheet("""
             QCheckBox::indicator {
-                width: 12;
-                height: 12;
+                width: 12px;
+                height: 12px;
             }
         """)
 
@@ -99,21 +134,23 @@ class QBlendProject(qtw.QWidget):
         self.w_render_filepath = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_render_filepath)
 
-        # [label] Open Render Output Image
-        self.w_open_render_image = QPushButton("", clicked=project.open_render_output_image)
-        self.w_open_render_image.setIcon(qtg.QIcon('kqueue/icons/open_render.svg'))
+        # [button] Render Thumbnail / Open Render
+        self.w_open_render_image = QPushButton(
+            "",
+            clicked=project.open_render_output_image
+        )
+
         self.w_open_render_image.setToolTip("Open the last render.")
-        self.w_open_render_image.setIconSize(qtc.QSize(14, 14))
-        self.w_open_render_image.setFixedSize(20, 20)
         self.w_open_render_image.setFlat(True)
+
         self.w_hBoxLayout.addWidget(self.w_open_render_image)
 
         # [label] Open Render Output Folder
         self.w_open_render_folder = QPushButton("", clicked=project.open_render_output_folder)
         self.w_open_render_folder.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
         self.w_open_render_folder.setToolTip("Open render folder.")
-        self.w_open_render_folder.setIconSize(qtc.QSize(14, 14))
-        self.w_open_render_folder.setFixedSize(20, 20)
+        self.w_open_render_folder.setIconSize(qtc.QSize(15, 15))
+        self.w_open_render_folder.setFixedSize(22, 22)
         self.w_open_render_folder.setFlat(True)
         self.w_hBoxLayout.addWidget(self.w_open_render_folder)
 
@@ -132,6 +169,94 @@ class QBlendProject(qtw.QWidget):
         ]
 
         self.update_widgets()
+
+    def __load_thumbnail(self, filename):
+        filename = str(filename)
+
+        if self._thumbnail_path == filename:
+            return
+
+        self._thumbnail_path = filename
+
+        thread = qtc.QThread(self)
+        worker = ThumbnailWorker(filename, size=42)
+
+        worker.moveToThread(thread)
+
+        thread.started.connect(worker.run)
+
+        worker.finished.connect(self.__thumbnail_finished)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(self.__thumbnail_thread_finished)
+
+        self._thumbnail_thread = thread
+        self._thumbnail_worker = worker
+
+        thread.start()
+
+
+    @qtc.pyqtSlot(str, qtg.QImage)
+    def __thumbnail_finished(self, filename, image):
+        if str(filename) != str(self._thumbnail_path):
+            return
+
+        if image.isNull():
+            self.w_open_render_image.setIcon(qtg.QIcon())
+            return
+
+        pixmap = qtg.QPixmap.fromImage(image)
+
+        self.w_open_render_image.setIcon(qtg.QIcon(pixmap))
+        self.w_open_render_image.setIconSize(pixmap.size())
+
+        self.w_open_render_image.setFixedSize(pixmap.size())
+
+
+    @qtc.pyqtSlot()
+    def __thumbnail_thread_finished(self):
+        self._thumbnail_thread = None
+        self._thumbnail_worker = None
+
+
+    def __update_thumbnail(self):
+        filename = self.project.get_render_output_image()
+
+        if not filename:
+            self._thumbnail_path = None
+            self.w_open_render_image.setIcon(qtg.QIcon())
+            self.w_open_render_image.setFixedSize(0, 0)
+            return
+
+        filename = str(filename)
+
+        if not Path(filename).is_file():
+            self._thumbnail_path = None
+            self.w_open_render_image.setIcon(qtg.QIcon())
+            self.w_open_render_image.setFixedSize(0, 0)
+            return
+
+        self.__load_thumbnail(filename)
+
+
+    def stop_thumbnail_thread(self):
+        thread = self._thumbnail_thread
+
+        if thread is None:
+            return
+
+        thread.quit()
+        thread.wait()
+
+        self._thumbnail_thread = None
+        self._thumbnail_worker = None
+
+
+    def closeEvent(self, event):
+        self.__stop_thumbnail_thread()
+        event.accept()
 
 
     def update_widgets(self):
@@ -171,7 +296,7 @@ class QBlendProject(qtw.QWidget):
             self.w_open = QPushButton("", clicked=lambda: self.project.open_file())
             self.w_open.setIcon(qtg.QIcon('kqueue/icons/blender_bw.svg'))
             self.w_open.setIconSize(qtc.QSize(16, 16))
-            self.w_open.setFixedSize(20, 20)
+            self.w_open.setFixedSize(22, 22)
             self.w_open.setToolTip("Open the Blender project.")
             self.w_hBoxLayout.addWidget(self.w_open)
 
@@ -181,7 +306,7 @@ class QBlendProject(qtw.QWidget):
                 self.w_reload = QPushButton("", clicked=lambda: self.project.reload())
                 self.w_reload.setIcon(qtg.QIcon('kqueue/icons/reload_project.svg'))
                 self.w_reload.setIconSize(qtc.QSize(16, 16))
-                self.w_reload.setFixedSize(20, 20)
+                self.w_reload.setFixedSize(22, 22)
                 self.w_reload.setToolTip("Reload the Blender project.")
                 self.w_hBoxLayout.addWidget(self.w_reload)
 
@@ -193,6 +318,8 @@ class QBlendProject(qtw.QWidget):
 
         self.w_open_render_image.setEnabled(bool(self.project.get_render_output_image()))
         self.w_open_render_folder.setEnabled(bool(self.project.get_render_output_folder()))
+
+        self.__update_thumbnail()
 
 
     def set_filename(self, filename):
@@ -241,8 +368,8 @@ class QBlendProject(qtw.QWidget):
 
         self.setToolTip(tt or None)
 
-
 ################################################################################
+
 ## Project Settings Window
 
 class QBlendProjectSettings(qtw.QWidget):
@@ -261,7 +388,7 @@ class QBlendProjectSettings(qtw.QWidget):
         self.setWindowIcon(qtg.QIcon(ICON))
         self.setMinimumWidth(450)
         self.setFixedHeight(525)
-        self.setWindowModality(Qt.ApplicationModal)
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.resize(450, 400)
 
         from ..main import set_window_titlebar_dark
@@ -379,7 +506,11 @@ class QBlendProjectSettings(qtw.QWidget):
 
             # [button] Render Filepath
             def locate_filepath():
-                filepath, _ = qtw.QFileDialog.getSaveFileName(self, 'Set Render Filepath', self.renderFilepath.text())
+                filepath, _ = qtw.QFileDialog.getSaveFileName(
+                    self,
+                    'Set Render Filepath',
+                    self.renderFilepath.text()
+                )
 
                 if not filepath:
                     return
@@ -424,7 +555,11 @@ class QBlendProjectSettings(qtw.QWidget):
         self.usePersistentData.setFixedHeight(FIELD_HEIGHT)
         self.usePersistentData.setCheckable(True)
         self.usePersistentData.setChecked(project.get_use_persistent_data())
-        self.usePersistentData.clicked.connect(lambda: self.usePersistentData.setText(str(self.usePersistentData.isChecked())))
+        self.usePersistentData.clicked.connect(
+            lambda: self.usePersistentData.setText(
+                str(self.usePersistentData.isChecked())
+            )
+        )
         l_form.addRow("Persistent Data", self.usePersistentData)
 
 
@@ -433,7 +568,11 @@ class QBlendProjectSettings(qtw.QWidget):
         self.useAdaptiveSampling.setFixedHeight(FIELD_HEIGHT)
         self.useAdaptiveSampling.setCheckable(True)
         self.useAdaptiveSampling.setChecked(project.get_use_adaptive_sampling())
-        self.useAdaptiveSampling.clicked.connect(lambda: self.useAdaptiveSampling.setText(str(self.useAdaptiveSampling.isChecked())))
+        self.useAdaptiveSampling.clicked.connect(
+            lambda: self.useAdaptiveSampling.setText(
+                str(self.useAdaptiveSampling.isChecked())
+            )
+        )
         l_form.addRow("Adaptive Sampling", self.useAdaptiveSampling)
 
 
@@ -449,7 +588,11 @@ class QBlendProjectSettings(qtw.QWidget):
         self.denoiserUseGPU.setFixedHeight(FIELD_HEIGHT)
         self.denoiserUseGPU.setCheckable(True)
         self.denoiserUseGPU.setChecked(project.get_denoising_use_gpu())
-        self.denoiserUseGPU.clicked.connect(lambda: self.denoiserUseGPU.setText(str(self.denoiserUseGPU.isChecked())))
+        self.denoiserUseGPU.clicked.connect(
+            lambda: self.denoiserUseGPU.setText(
+                str(self.denoiserUseGPU.isChecked())
+            )
+        )
         l_form.addRow("Use GPU", self.denoiserUseGPU)
 
         # [edit] Denoiser Input Passes
@@ -474,7 +617,7 @@ class QBlendProjectSettings(qtw.QWidget):
         # [edit] Notes
         self.notes = qtw.QTextEdit(str(project.get_notes()))
         self.notes.setFixedHeight(FIELD_HEIGHT * 3)
-        self.notes.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.notes.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         hbox.addWidget(self.notes)
 
 
@@ -491,7 +634,7 @@ class QBlendProjectSettings(qtw.QWidget):
             save = QPushButton("Save", clicked=lambda: self.save_and_close())
             save.setFixedWidth(100)
             save.setFixedHeight(30)
-            hbox.addWidget(save, 0, Qt.AlignRight)
+            hbox.addWidget(save, 0, Qt.AlignmentFlag.AlignRight)
 
             # [button] Cancel
             cancel = QPushButton("Cancel", clicked=lambda: self.close())
@@ -506,10 +649,10 @@ class QBlendProjectSettings(qtw.QWidget):
 
     def keyPressEvent(self, event):
 
-        if event.key() == Qt.Key_Escape:
+        if event.key() == Qt.Key.Key_Escape:
             self.close()
 
-        elif event.key() == Qt.Key_Return:
+        elif event.key() == Qt.Key.Key_Return:
             self.save_and_close()
 
 

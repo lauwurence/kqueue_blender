@@ -2,7 +2,7 @@
 ## Blend Files Loader
 
 import subprocess
-import PyQt5.QtCore as qtc
+import PyQt6.QtCore as qtc
 import json
 
 from os import makedirs
@@ -19,6 +19,8 @@ class LoaderThread(qtc.QThread):
 
     def __init__(self, *files):
         super().__init__()
+
+        self.setObjectName("LoaderThread")
 
         self.files = files
 
@@ -38,7 +40,7 @@ class LoaderThread(qtc.QThread):
         # Load cache
         cache = save_load.load_cache()
 
-        files = [ join(file) for file in self.files if file.endswith(".blend")]
+        files = [join(file) for file in self.files if file.endswith(".blend")]
         loaded_projects_list = []
         need_save = False
 
@@ -75,26 +77,31 @@ class LoaderThread(qtc.QThread):
 
                 BATCH = f"""
 @CHCP 65001 > NUL
-blender "{file}" --factory-startup --background  --python "{store.get_data_py.resolve()}" "{store.bridge_file.resolve()}"
+blender "{file}" --factory-startup --background --python "{store.get_data_py.resolve()}" "{store.bridge_file.resolve()}"
 """
 
                 with open(store.get_data_bat, 'w') as f:
                     f.write(BATCH.strip())
 
-                process = subprocess.Popen([store.get_data_bat.resolve()],
-                                        # stderr=subprocess.STDOUT,
-                                        # stdout=subprocess.PIPE,
-                                        # stdin=subprocess.PIPE,
-                                        #    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, #DETACHED_PROCESS
-                                        #    creationflags=subprocess.DETACHED_PROCESS, #DETACHED_PROCESS
-                                        #    preexec_fn=os.setsid,
-                                        cwd=join(Path(preset.blender_exe).parent),
-                                        shell=True)
+                process = subprocess.Popen(
+                    [store.get_data_bat.resolve()],
+                    # stderr=subprocess.STDOUT,
+                    # stdout=subprocess.PIPE,
+                    # stdin=subprocess.PIPE,
+                    #    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, #DETACHED_PROCESS
+                    #    creationflags=subprocess.DETACHED_PROCESS, #DETACHED_PROCESS
+                    #    preexec_fn=os.setsid,
+                    cwd=join(Path(preset.blender_exe).parent),
+                    shell=True
+                )
 
                 process.wait()
 
                 if not store.bridge_file.exists():
-                    main.log(f'Could not fetch project data: {file} | Bridge: {store.bridge_file}')
+                    main.log(
+                        f'Could not fetch project data: {file} | '
+                        f'Bridge: {store.bridge_file}'
+                    )
                     return
 
                 # Read project data
