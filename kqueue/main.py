@@ -434,7 +434,7 @@ class QueuePreset():
         self.process = None
 
 
-    def shutdown(self, delay=15.0):
+    def shutdown(self, delay=300):
         """
         Show countdown and shotdown PC.
         """
@@ -1403,11 +1403,7 @@ def log(*args, developer=False, write=True, open_file=False):
         while retries > 0:
 
             try:
-                with open(
-                    store.crash_file,
-                    'a',
-                    encoding='utf-8'
-                ) as f:
+                with open(store.crash_file, 'a', encoding='utf-8') as f:
                     f.write(f"\n{line}")
 
                 done = True
@@ -1479,7 +1475,7 @@ QLineEdit {
     color: #e0e0e0;
     border: 1px solid #555555;
     border-radius: 4px;
-    padding: 3px;
+    padding: 1px;
     selection-background-color: #448fff;
 }
 
@@ -1567,14 +1563,14 @@ QListWidget::item:hover {
 
 QListWidget::item:selected {
     color: #ffffff;
-    border: 2px solid #448fff;
+    border: 1px solid #448fff;
     outline: none;
 }
 
 QListWidget::item:selected:active {
     color: #1e1e1e;
     background-color: #1e1e1e;
-    border: 2px solid #3377dd;
+    border: 1px solid #3377dd;
     outline: none;
 }
 
