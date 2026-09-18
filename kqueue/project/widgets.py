@@ -255,7 +255,7 @@ class QBlendProject(qtw.QWidget):
 
 
     def closeEvent(self, event):
-        self.__stop_thumbnail_thread()
+        self.stop_thumbnail_thread()
         event.accept()
 
 
@@ -569,9 +569,7 @@ class QBlendProjectSettings(qtw.QWidget):
         self.useAdaptiveSampling.setCheckable(True)
         self.useAdaptiveSampling.setChecked(project.get_use_adaptive_sampling())
         self.useAdaptiveSampling.clicked.connect(
-            lambda: self.useAdaptiveSampling.setText(
-                str(self.useAdaptiveSampling.isChecked())
-            )
+            lambda: self.useAdaptiveSampling.setText(str(self.useAdaptiveSampling.isChecked()))
         )
         l_form.addRow("Adaptive Sampling", self.useAdaptiveSampling)
 
