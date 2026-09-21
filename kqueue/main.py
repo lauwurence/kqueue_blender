@@ -24,7 +24,7 @@ from .project.widgets import QBlendProject, QBlendProjectSettings
 from .render import RenderThread
 from .loader import LoaderThread
 from .config import *
-from . import store, save_load
+from . import store, save_load, status
 
 from .widgets.QPushButton import QPushButton
 from .widgets.QComboBox import QComboBox
@@ -75,7 +75,7 @@ class QueuePreset():
         self.process = None
 
         # Status.
-        self.blender_status = 'READY_TO_RENDER'
+        self.blender_status = status.READY_TO_RENDER
 
         # Are we currently loading new blender projects?
         self.is_adding_projects = False
@@ -151,9 +151,6 @@ class QueuePreset():
         Set current status.
         """
 
-        if value not in ['READY_TO_RENDER', 'RENDERING', 'RENDERING_STOPPING', 'RENDERING_FINISHED']:
-            raise Exception(f'Unknown status "{value}".')
-
         self.blender_status = value
 
 
@@ -161,11 +158,6 @@ class QueuePreset():
         """
         Check current status.
         """
-
-        for value in values:
-
-            if value not in ['READY_TO_RENDER', 'RENDERING', 'RENDERING_STOPPING', 'RENDERING_FINISHED']:
-                raise Exception(f'Unknown status "{value}".')
 
         return self.blender_status in values
 
@@ -392,7 +384,7 @@ class QueuePreset():
 
         mw.update_gpu_monitor.emit()
 
-        if not self.is_status('RENDERING', 'RENDERING_STOPPING'):
+        if not self.is_status(status.RENDERING, status.RENDERING_STOPPING):
             mw.update_widgets.emit()
 
 
@@ -401,37 +393,41 @@ class QueuePreset():
         Start rendering process.
         """
 
-        if not self.is_status('READY_TO_RENDER') or not preset.project_list:
+        if not self.is_status(status.READY_TO_RENDER) or not preset.project_list:
             return
 
         self.init_render_variables(gui=True)
 
         self.render_thread = RenderThread()
-
         self.render_thread.finished.connect(self.render_thread.deleteLater)
-
         self.render_thread.start()
 
 
     def stop_render(self):
-        """
-        Stop rendering process.
-        """
-
-        if not self.is_status('RENDERING') or not self.process:
+        if not self.is_status(status.RENDERING) or not self.process:
             return
 
-        if self.is_status('RENDERING_STOPPING'):
-            return
-
-        self.set_status('RENDERING_STOPPING')
+        self.set_status(status.RENDERING_STOPPING)
         log("Stopping rendering...")
 
-        for proc in Process(self.process.pid).children(recursive=True):
-            proc.terminate()
+        process = self.process
 
-        self.process.terminate()
-        self.process = None
+        try:
+            parent = Process(process.pid)
+
+            for child in parent.children(recursive=True):
+                try:
+                    child.terminate()
+                except Exception as e:
+                    log(f"WARN Failed to terminate child {child.pid}: {e}")
+
+            try:
+                process.terminate()
+            except Exception as e:
+                log(f"WARN Failed to terminate Blender: {e}")
+
+        except Exception as e:
+            log(f"WARN Failed to stop Blender: {e}")
 
 
     def shutdown(self, delay=300):
@@ -1022,7 +1018,7 @@ class MainWindow(qtw.QMainWindow):
         Handle key presses.
         """
 
-        if preset.is_status('RENDERING') or preset.is_status('RENDERING_STOPPING'):
+        if preset.is_status(status.RENDERING) or preset.is_status(status.RENDERING_STOPPING):
             return
 
         # Delete
@@ -1068,24 +1064,52 @@ class MainWindow(qtw.QMainWindow):
         """
 
         if DEV_MODE:
-            event.ignore()
             preset.stop_render()
             event.accept()
+            return
 
-        else:
-            result = qtw.QMessageBox.question(
-                self,
-                "Confirm Exit",
-                "Are you sure you want to exit?",
-                qtw.QMessageBox.StandardButton.Yes |
-                qtw.QMessageBox.StandardButton.No
+        # Если есть несохранённые изменения
+        if preset.save_needed:
+            box = qtw.QMessageBox(self)
+
+            box.setWindowTitle("Unsaved Changes")
+            box.setText("The project has unsaved changes. Save them?")
+            box.setIcon(qtw.QMessageBox.Icon.Question)
+
+            save_button = box.addButton(
+                "Save",
+                qtw.QMessageBox.ButtonRole.AcceptRole
             )
 
-            event.ignore()
+            discard_button = box.addButton(
+                "Discard",
+                qtw.QMessageBox.ButtonRole.DestructiveRole
+            )
 
-            if result == qtw.QMessageBox.StandardButton.Yes:
-                preset.stop_render()
-                event.accept()
+            cancel_button = box.addButton(
+                "Cancel",
+                qtw.QMessageBox.ButtonRole.RejectRole
+            )
+
+            save_button.setMinimumWidth(80)
+            discard_button.setMinimumWidth(80)
+            cancel_button.setMinimumWidth(80)
+
+            box.setMinimumWidth(400)
+
+            box.exec()
+
+            clicked = box.clickedButton()
+
+            if clicked == cancel_button:
+                event.ignore()
+                return
+
+            if clicked == save_button:
+                preset.save()
+
+        preset.stop_render()
+        event.accept()
 
 
     ############################################################################
@@ -1134,8 +1158,20 @@ class MainWindow(qtw.QMainWindow):
 
         self.stop_thumbnail_thread()
 
-        old_value = self.w_listOfProjects.verticalScrollBar().value()
-        old_files = [p.file for p in preset.project_list]
+        # Save current scroll position
+        scroll_value = self.w_listOfProjects.verticalScrollBar().value()
+
+        # Save currently selected project
+        current_item = self.w_listOfProjects.currentItem()
+        current_project = None
+
+        if current_item is not None:
+            w_project = self.w_listOfProjects.itemWidget(current_item)
+
+            if w_project is not None:
+                current_project = w_project.project
+
+        old_files = [ p.file for p in preset.project_list ]
 
         # Sync variable with the list widget
         if sync:
@@ -1144,12 +1180,15 @@ class MainWindow(qtw.QMainWindow):
             for i in range(self.w_listOfProjects.count()):
                 item = self.w_listOfProjects.item(i)
                 w_project = self.w_listOfProjects.itemWidget(item)
-                project_list.append(w_project.project)
+
+                if w_project is not None:
+                    project_list.append(w_project.project)
 
             preset.project_list = project_list
 
         # Add items to the list widget
         self.w_listOfProjects.clear()
+
         global_active = True
 
         for project in preset.project_list:
@@ -1168,7 +1207,7 @@ class MainWindow(qtw.QMainWindow):
             w_project.set_render_filepath(project.get_render_filepath())
             w_project.update_widgets()
 
-            item = qtw.QListWidgetItem(self.w_listOfProjects)
+            item = qtw.QListWidgetItem()
             item.setSizeHint(w_project.sizeHint())
 
             self.w_listOfProjects.addItem(item)
@@ -1211,25 +1250,37 @@ class MainWindow(qtw.QMainWindow):
         self.w_pProgressBar.setValue(0)
         self.w_rProgressBar.setValue(0)
 
-        # If list changed
-        new_files = [p.file for p in preset.project_list]
+        new_files = [ p.file for p in preset.project_list ]
 
         if old_files != new_files:
             preset.set_need_save()
 
-        max_cycles = 1000
+        # Restore current project and scroll position
+        def restore_list_position():
 
-        while (
-            self.w_listOfProjects.verticalScrollBar().value() != old_value
-            and max_cycles > 0
-        ):
-            self.w_listOfProjects.verticalScrollBar().setValue(old_value)
-            max_cycles -= 1
+            # Restore selected project
+            if current_project is not None:
+                for i in range(self.w_listOfProjects.count()):
+                    item = self.w_listOfProjects.item(i)
+                    w_project = self.w_listOfProjects.itemWidget(item)
+
+                    if (
+                        w_project is not None
+                        and w_project.project is current_project
+                    ):
+                        self.w_listOfProjects.setCurrentItem(item)
+                        break
+
+            # Restore scroll position
+            scrollbar = self.w_listOfProjects.verticalScrollBar()
+            scrollbar.setValue(min(scroll_value, scrollbar.maximum()))
+
+        qtc.QTimer.singleShot(0, restore_list_position)
 
 
     def __update_widgets(self):
 
-        if preset.is_status('RENDERING', 'RENDERING_STOPPING'):
+        if preset.is_status(status.RENDERING, status.RENDERING_STOPPING):
             self.projectSave.setEnabled(False)
             self.projectLoad.setEnabled(False)
             self.projectReload.setEnabled(False)
@@ -1238,11 +1289,7 @@ class MainWindow(qtw.QMainWindow):
             self.w_preview_render.setEnabled(False)
             self.w_marker_render.setEnabled(False)
             self.w_global_reload.setEnabled(False)
-
-            self.w_logStatus.setImage(
-                "kqueue/icons/status_loading.svg"
-            )
-
+            self.w_logStatus.setImage("kqueue/icons/status_loading.svg")
             self.w_global_active.setEnabled(False)
 
             for widget in self.w_setGlobalSamples_list:
@@ -1256,18 +1303,12 @@ class MainWindow(qtw.QMainWindow):
             self.w_selective.setEnabled(True)
             self.w_preview_render.setEnabled(True)
             self.w_marker_render.setEnabled(True)
-            self.w_global_reload.setEnabled(
-                preset.has_outdated_projects()
-            )
+            self.w_global_reload.setEnabled(preset.has_outdated_projects())
 
             if preset.is_adding_projects:
-                self.w_logStatus.setImage(
-                    "kqueue/icons/status_loading.svg"
-                )
+                self.w_logStatus.setImage("kqueue/icons/status_loading.svg")
             else:
-                self.w_logStatus.setImage(
-                    "kqueue/icons/status_idle.svg"
-                )
+                self.w_logStatus.setImage("kqueue/icons/status_idle.svg")
 
             self.w_global_active.setEnabled(True)
 
@@ -1277,47 +1318,33 @@ class MainWindow(qtw.QMainWindow):
         self.w_startRender.setEnabled(
             bool(
                 preset.blender_exe
-                and not preset.is_status('RENDERING')
+                and not preset.is_status(status.RENDERING)
                 and preset.project_list
                 and preset.get_global_frames_number()
             )
         )
 
         self.w_stopRender.setEnabled(
-            preset.is_status('RENDERING')
-            and not preset.is_status('RENDERING_STOPPING')
+            preset.is_status(status.RENDERING)
+            and not preset.is_status(status.RENDERING_STOPPING)
         )
 
         self.w_listOfProjects.setEnabled(
-            bool(
-                not preset.is_adding_projects
-                and not preset.is_status('RENDERING')
-            )
+            not preset.is_adding_projects
+            and not preset.is_status(status.RENDERING)
         )
 
-        self.w_cancelShutdown.setEnabled(
-            bool(preset.is_shutting_down)
-        )
+        self.w_cancelShutdown.setEnabled(bool(preset.is_shutting_down))
 
-        self.w_openRender.setEnabled(
-            bool(preset.renders_list)
-        )
+        self.w_openRender.setEnabled(bool(preset.renders_list))
 
-        self.w_openRenderFolder.setEnabled(
-            bool(preset.renders_list)
-        )
+        self.w_openRenderFolder.setEnabled(bool(preset.renders_list))
 
-        self.w_selective.setChecked(
-            bool(preset.selective_render)
-        )
+        self.w_selective.setChecked(bool(preset.selective_render))
 
-        self.w_preview_render.setChecked(
-            bool(preset.preview_render)
-        )
+        self.w_preview_render.setChecked(bool(preset.preview_render))
 
-        self.w_marker_render.setChecked(
-            bool(preset.marker_render)
-        )
+        self.w_marker_render.setChecked(bool(preset.marker_render))
 
         for i in range(self.w_listOfProjects.count()):
             item = self.w_listOfProjects.item(i)
@@ -1349,7 +1376,7 @@ class MainWindow(qtw.QMainWindow):
                     "color: #4a4a4a;"
                 )
 
-            if preset and preset.is_status('RENDERING'):
+            if preset and preset.is_status(status.RENDERING):
 
                 if temper > 80:
                     tt = (
@@ -1430,383 +1457,7 @@ store.mw = mw = MainWindow()
 store.preset = preset = QueuePreset()
 
 
-app.setStyleSheet('''
-* {
-    font-family: Segoe UI, Arial, sans-serif;
-}
-
-QLabel {
-    font-size: 11px;
-    color: #e0e0e0;
-}
-
-QLabel:disabled {
-    font-size: 11px;
-    color: #707070;
-}
-
-QPushButton {
-    font-size: 11px;
-    background-color: #3a3a3a;
-    color: #e0e0e0;
-    border: 1px solid #555555;
-    border-radius: 4px;
-    padding: 3px;
-}
-
-QPushButton:hover {
-    background-color: #4a4a4a;
-    border: 1px solid #666666;
-}
-
-QPushButton:pressed {
-    background-color: #2a2a2a;
-}
-
-QPushButton:disabled {
-    background-color: #2a2a2a;
-    color: #707070;
-    border: 1px solid #404040;
-}
-
-QLineEdit {
-    font-size: 11px;
-    background-color: #2d2d2d;
-    color: #e0e0e0;
-    border: 1px solid #555555;
-    border-radius: 4px;
-    padding: 1px;
-    selection-background-color: #448fff;
-}
-
-QLineEdit:focus {
-    border: 1px solid #448fff;
-}
-
-QLineEdit:disabled {
-    background-color: #252525;
-    color: #707070;
-    border: 1px solid #404040;
-}
-
-QComboBox {
-    font-size: 11px;
-    background-color: #3a3a3a;
-    color: #e0e0e0;
-    border: 1px solid #555555;
-    border-radius: 4px;
-    padding: 3px;
-}
-
-QComboBox::drop-down {
-    border: none;
-    width: 20px;
-}
-
-QComboBox::down-arrow {
-    image: url(kqueue/icons/drop_down.svg);
-    width: 12px;
-    height: 12px;
-}
-
-QComboBox QAbstractItemView {
-    background-color: #3a3a3a;
-    color: #e0e0e0;
-    border: 1px solid #404040;
-    border-radius: 4px;
-    selection-background-color: #555555;
-    selection-color: #ffffff;
-    outline: none;
-}
-
-QComboBox QAbstractItemView::item {
-    padding: 4px;
-    background-color: #2a2a2a;
-    border: none;
-}
-
-QComboBox QAbstractItemView::item:hover {
-    background-color: #2a2a2a;
-}
-
-QComboBox QAbstractItemView::item:selected {
-    background-color: #3a3a3a;
-    color: #ffffff;
-}
-
-QComboBox:disabled {
-    background-color: #2a2a2a;
-    color: #707070;
-    border: 1px solid #404040;
-}
-
-QListWidget {
-    color: #e0e0e0;
-    border-radius: 6px;
-    padding: 3px;
-    font-size: 12px;
-    border: 1px solid #555555;
-    outline: none;
-}
-
-QListWidget::item {
-    padding: 3px;
-    border: 1px solid transparent;
-    border-radius: 5px;
-    margin: 0px;
-}
-
-QListWidget::item:hover {
-    border: 1px solid #666666;
-    outline: none;
-}
-
-QListWidget::item:selected {
-    color: #ffffff;
-    border: 1px solid #448fff;
-    outline: none;
-}
-
-QListWidget::item:selected:active {
-    color: #1e1e1e;
-    background-color: #1e1e1e;
-    border: 1px solid #3377dd;
-    outline: none;
-}
-
-QScrollBar:vertical {
-    background-color: transparent;
-    width: 14px;
-    border: none;
-    margin: 0px;
-    padding: 2px;
-}
-
-QScrollBar::handle:vertical {
-    background-color: rgba(85, 85, 85, 120);
-    border-radius: 5px;
-    min-height: 20px;
-    margin: 0px 0px;
-}
-
-QScrollBar::handle:vertical:hover {
-    background-color: rgba(102, 102, 102, 180);
-}
-
-QScrollBar:vertical:hover {
-    background-color: rgba(45, 45, 45, 30);
-}
-
-QScrollBar::add-line:vertical,
-QScrollBar::sub-line:vertical {
-    border: none;
-    background: transparent;
-    height: 0px;
-}
-
-QScrollBar::up-arrow:vertical,
-QScrollBar::down-arrow:vertical,
-QScrollBar::add-page:vertical,
-QScrollBar::sub-page:vertical {
-    background: transparent;
-    border: none;
-}
-
-QScrollBar:horizontal {
-    background-color: transparent;
-    height: 14px;
-    border: none;
-    margin: 0px;
-    padding: 2px;
-}
-
-QScrollBar::handle:horizontal {
-    background-color: rgba(85, 85, 85, 120);
-    border-radius: 5px;
-    min-width: 20px;
-    margin: 0px 0px;
-}
-
-QScrollBar::handle:horizontal:hover {
-    background-color: rgba(102, 102, 102, 180);
-}
-
-QScrollBar:horizontal:hover {
-    background-color: rgba(45, 45, 45, 30);
-}
-
-QScrollBar::add-line:horizontal,
-QScrollBar::sub-line:horizontal {
-    border: none;
-    background: transparent;
-    width: 0px;
-}
-
-QScrollBar::left-arrow:horizontal,
-QScrollBar::right-arrow:horizontal,
-QScrollBar::add-page:horizontal,
-QScrollBar::sub-page:horizontal {
-    background: transparent;
-    border: none;
-}
-
-QMainWindow, QDialog, QWidget {
-    background-color: #1e1e1e;
-}
-
-QMenuBar {
-    background-color: #2d2d2d;
-    color: #e0e0e0;
-    font-size: 11px;
-}
-
-QMenuBar::item:selected {
-    background-color: #448fff;
-}
-
-QMenu {
-    background-color: #2d2d2d;
-    color: #e0e0e0;
-    border: 1px solid #555555;
-    font-size: 11px;
-}
-
-QMenu::item:selected {
-    background-color: #448fff;
-}
-
-QCheckBox, QRadioButton {
-    color: #e0e0e0;
-    font-size: 11px;
-}
-
-QCheckBox:disabled, QRadioButton:disabled {
-    color: #707070;
-    font-size: 11px;
-}
-
-QCheckBox::indicator, QRadioButton::indicator {
-    width: 14px;
-    height: 14px;
-    border-radius: 4px;
-}
-
-QCheckBox::indicator:unchecked {
-    background-color: #2d2d2d;
-    border: 1px solid #555555;
-}
-
-QCheckBox::indicator:checked {
-    background-color: #448fff;
-    border: 1px solid #448fff;
-}
-
-QCheckBox::indicator:unchecked:disabled {
-    background-color: #212121;
-    border: 1px solid #2e2d2d;
-}
-
-QCheckBox::indicator:checked:disabled {
-    background-color: #224880;
-    border: 1px solid #224880;
-}
-
-QGroupBox {
-    color: #e0e0e0;
-    border: 1px solid #555555;
-    border-radius: 5px;
-    margin-top: 10px;
-    font-size: 11px;
-    font-weight: bold;
-}
-
-QGroupBox::title {
-    subcontrol-origin: margin;
-    left: 10px;
-    padding: 0 5px 0 5px;
-}
-
-QTabWidget::pane {
-    border: 1px solid #555555;
-    background-color: #2d2d2d;
-    border-radius: 4px;
-}
-
-QTabBar::tab {
-    background-color: #3a3a3a;
-    color: #e0e0e0;
-    padding: 6px 12px;
-    margin-right: 2px;
-    border-top-left-radius: 4px;
-    border-top-right-radius: 4px;
-    font-size: 11px;
-}
-
-QTabBar::tab:selected {
-    background-color: #448fff;
-    color: #ffffff;
-}
-
-QTabBar::tab:hover:!selected {
-    background-color: #4a4a4a;
-}
-
-QTextEdit, QPlainTextEdit {
-    background-color: #2d2d2d;
-    color: #e0e0e0;
-    border: 1px solid #555555;
-    border-radius: 4px;
-    padding: 3px;
-    font-size: 11px;
-    selection-background-color: #448fff;
-}
-
-QHeaderView::section {
-    background-color: #3a3a3a;
-    color: #e0e0e0;
-    padding: 5px;
-    border: 1px solid #555555;
-    font-size: 11px;
-}
-
-QTableView, QTreeView {
-    background-color: #2d2d2d;
-    color: #e0e0e0;
-    alternate-background-color: #252525;
-    selection-background-color: #448fff;
-    selection-color: #ffffff;
-    font-size: 11px;
-}
-
-QTableView::item, QTreeView::item {
-    padding: 3px;
-}
-
-QProgressBar {
-    border: none;
-    border-radius: 4px;
-    background-color: #37474f;
-    color: #e0e0e0;
-    text-align: center;
-    font-size: 11px;
-    height: 4px;
-}
-
-QProgressBar::chunk {
-    border-radius: 4px;
-    background-color: #448fff;
-    margin: 0px;
-}
-
-QToolTip {
-    background-color: #3a3a3a;
-    color: #e0e0e0;
-    border: 1px solid #555555;
-    border-radius: 4px;
-    padding: 5px;
-    font-size: 11px;
-}
-''')
+app.setStyleSheet(STYLE)
 
 
 ############################################################################

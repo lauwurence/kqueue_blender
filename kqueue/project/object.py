@@ -1,7 +1,8 @@
 ################################################################################
 ## Project Object
 
-import os
+import subprocess
+
 from pathlib import Path
 
 from ..utils.filter_frames import filter_frames
@@ -287,15 +288,13 @@ class BlendProject():
 
     def open_file(self):
         """
-        Open project file.
+        Open project file with Blender.
         """
 
-        if not self.file_exists():
+        if not self.file_exists() or not store.preset.blender_exe:
             return
 
-        print(f'Starting: {self.file}')
-
-        os.startfile(self.file)
+        subprocess.Popen([ store.preset.blender_exe, self.file ])
 
 
     def get_render_output_image(self):

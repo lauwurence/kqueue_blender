@@ -14,6 +14,25 @@ from .. import store
 
 from pathlib import Path
 
+
+def set_path_label(label, path):
+    path = str(path)
+
+    font_metrics = qtg.QFontMetrics(label.font())
+
+    label.setText(
+        font_metrics.elidedText(
+            path,
+            Qt.TextElideMode.ElideMiddle,
+            180
+        )
+    )
+
+    label.setToolTip(path)
+
+################################################################################
+## Thumbnail Worker
+
 class ThumbnailWorker(qtc.QObject):
     finished = qtc.pyqtSignal(str, qtg.QImage)
 
@@ -67,20 +86,30 @@ class QBlendProject(qtw.QWidget):
 
         def add_separator():
 
-            # [frame} Separator
-            separator = qtw.QFrame()
-            separator.setFrameShape(qtw.QFrame.Shape.VLine)
-            separator.setFrameShadow(qtw.QFrame.Shadow.Plain)
+            separator = qtw.QWidget()
+            separator.setFixedSize(2, 14)
+
             separator.setStyleSheet("""
-                QFrame {
-                    background-color: #4a4a4a;
-                    color: #4a4a4a;
-                    margin: 2px;
+                QWidget {
+                    background-color: #555;
+                    border-radius: 1px;
                 }
             """)
 
             self.w_hBoxLayout.addWidget(separator)
 
+        def add_icon_label(icon, tooltip):
+            label = qtw.QLabel()
+            label.setPixmap(
+                qtg.QIcon(f'kqueue/icons/{icon}.svg').pixmap(15, 15)
+            )
+            label.setFixedSize(18, 18)
+            label.setToolTip(tooltip)
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            self.w_hBoxLayout.addWidget(label)
+
+            return label
 
         # [check] Active
         self.w_active = qtw.QCheckBox()
@@ -106,31 +135,60 @@ class QBlendProject(qtw.QWidget):
 
         add_separator()
 
-        # [label] Frames
+        # [icon + label] Frames
+        self.w_frames_icon = add_icon_label(
+            'frames',
+            'Frames'
+        )
+
         self.w_frames = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_frames)
 
         add_separator()
 
-        # [label] Resolution
+
+        # [icon + label] Resolution
+        self.w_resolution_icon = add_icon_label(
+            'resolution',
+            'Resolution'
+        )
+
         self.w_resolution = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_resolution)
 
         add_separator()
 
-        # [label] Samples
+
+        # [icon + label] Samples
+        self.w_samples_icon = add_icon_label(
+            'samples',
+            'Samples'
+        )
+
         self.w_samples = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_samples)
 
         add_separator()
 
-        # [label] Camera
+
+        # [icon + label] Camera
+        self.w_camera_icon = add_icon_label(
+            'camera',
+            'Camera'
+        )
+
         self.w_camera = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_camera)
 
         add_separator()
 
-        # [label] Output
+
+        # [icon + label] Output
+        self.w_render_filepath_icon = add_icon_label(
+            'output',
+            'Render output'
+        )
+
         self.w_render_filepath = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_render_filepath)
 
@@ -144,6 +202,9 @@ class QBlendProject(qtw.QWidget):
         self.w_open_render_image.setFlat(True)
 
         self.w_hBoxLayout.addWidget(self.w_open_render_image)
+
+        add_separator()
+
 
         # [label] Open Render Output Folder
         self.w_open_render_folder = QPushButton("", clicked=project.open_render_output_folder)
@@ -297,7 +358,7 @@ class QBlendProject(qtw.QWidget):
             self.w_open.setIcon(qtg.QIcon('kqueue/icons/blender_bw.svg'))
             self.w_open.setIconSize(qtc.QSize(16, 16))
             self.w_open.setFixedSize(22, 22)
-            self.w_open.setToolTip("Open the Blender project.")
+            self.w_open.setToolTip("Open the project with the provided Blender executable.")
             self.w_hBoxLayout.addWidget(self.w_open)
 
             if self.project.is_outdated():
@@ -334,30 +395,39 @@ class QBlendProject(qtw.QWidget):
         self.w_active.setChecked(value)
 
     def set_frames(self, frames):
-        self.w_frames.setText(f'Fra: [{frames}]')
+        self.w_frames.setText(f'[{frames}]')
 
         if self.project.frames_overrode():
             self.w_frames.setStyleSheet("font-weight: bold;")
+        else:
+            self.w_frames.setStyleSheet("")
 
     def set_samples(self, samples):
-        self.w_samples.setText(f'Sam: {samples}')
+        self.w_samples.setText(str(samples))
 
     def set_resolution(self, resolution):
-        self.w_resolution.setText(f'Res: {resolution}')
+        self.w_resolution.setText(resolution)
 
     def set_camera(self, camera):
-
         if camera:
-            self.w_camera.setText(f'Cam: "{camera}"')
+            self.w_camera.setText(f'"{camera}"')
+            self.w_camera.setStyleSheet("")
         else:
-            self.w_camera.setText(f'No Camera!')
-            self.w_camera.setStyleSheet("color: red;")
+            self.w_camera.setText("No Camera!")
+            self.w_camera.setStyleSheet("color: red; font-weight: bold;")
 
     def set_render_filepath(self, filepath):
-        self.w_render_filepath.setText(f'Out: "{filepath}"')
+        path = str(filepath)
+
+        set_path_label(
+            self.w_render_filepath,
+            f'"{path}"'
+        )
 
         if not self.project.render_filepath_exists():
             self.w_render_filepath.setStyleSheet("color: red;")
+        else:
+            self.w_render_filepath.setStyleSheet("")
 
     def set_tooltip(self, text):
 

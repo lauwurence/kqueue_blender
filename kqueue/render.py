@@ -6,20 +6,16 @@ import subprocess
 import PyQt6.QtCore as qtc
 
 from re import search
-from io import TextIOWrapper
 from pathlib import Path
 from .utils.pathutils import join
 from .utils import monitor, audio
 from .config import *
-from . import store, main
+from . import store, main, status
 
 
 ################################################################################
 
 class RenderThread(qtc.QThread):
-
-    finished = qtc.pyqtSignal()
-    listener_started = False
 
 
     def __init__(self):
@@ -27,13 +23,33 @@ class RenderThread(qtc.QThread):
 
         self.setObjectName("RenderThread")
 
+        self.listen_thread = None
+        self.timer_thread = None
+
 
     def run(self):
         preset = store.preset
         mw = store.mw
 
+        self.listen_thread = RenderListenThread()
+        self.timer_thread = RenderTimerThread()
+
+        self.listen_thread.gProgressBar_setValue.connect(mw.w_gProgressBar.setValue)
+        self.listen_thread.gProgress_setText.connect(mw.w_gProgress.setText)
+
+        self.listen_thread.pProgressBar_setValue.connect(mw.w_pProgressBar.setValue)
+        self.listen_thread.pProgress_setText.connect(mw.w_pProgress.setText)
+
+        self.listen_thread.rProgressBar_setValue.connect(mw.w_rProgressBar.setValueAnimated)
+        # self.listen_thread.gProgressETA_setText.connect(mw.w_gProgressETA.setText)
+
+        self.timer_thread.gProgressETA_setText.connect(mw.w_gProgressETA.setText)
+
+        self.listen_thread.listOfProjects_setCurrentItem.connect(mw.w_listOfProjects.setCurrentItem)
+        self.listen_thread.listOfProjects_setStyleSheet.connect(mw.w_listOfProjects.setStyleSheet)
+
         audio.play(RENDER_START_AUDIO)
-        preset.set_status('RENDERING')
+        preset.set_status(status.RENDERING)
         mw.update_widgets.emit()
 
         for project in preset.project_list:
@@ -41,7 +57,7 @@ class RenderThread(qtc.QThread):
             if not project.is_renderable():
                 continue
 
-            if preset.is_status('RENDERING_STOPPING', 'RENDERING_FINISHED'):
+            if preset.is_status(status.RENDERING_STOPPING, status.RENDERING_FINISHED):
                 break
 
             sc = project.get_scene()
@@ -169,62 +185,34 @@ blender --background "{project.file}" --scene "{sc}" -E "{'CYCLES' if not preset
 
             preset.process = subprocess.Popen(
                 [ BATCH_FILE ],
-                stderr=subprocess.STDOUT,
                 stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 stdin=subprocess.PIPE,
                 cwd=join(Path(preset.blender_exe).parent),
-                #    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, #DETACHED_PROCESS
                 creationflags=subprocess.CREATE_NO_WINDOW,
-                #    preexec_fn=os.setsid,
-                shell=False
-                )
+                shell=False,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                bufsize=1,
+            )
 
-            if not self.listener_started:
-                self.listener_started = True
-
-
-                self.listen_thread = RenderListenThread()
-                self.timer_thread = RenderTimerThread()
-
-                # self.listen_thread = qtc.QThread()
-                # self.listen_worker = RenderListenThread()
-                # self.listen_worker.moveToThread(self.listen_thread)
-
-                self.listen_thread.gProgressBar_setValue.connect(mw.w_gProgressBar.setValue)
-                self.listen_thread.gProgress_setText.connect(mw.w_gProgress.setText)
-
-                self.listen_thread.pProgressBar_setValue.connect(mw.w_pProgressBar.setValue)
-                self.listen_thread.pProgress_setText.connect(mw.w_pProgress.setText)
-
-                self.listen_thread.rProgressBar_setValue.connect(mw.w_rProgressBar.setValueAnimated)
-                # self.listen_thread.gProgressETA_setText.connect(mw.w_gProgressETA.setText)
-
-                self.timer_thread.gProgressETA_setText.connect(mw.w_gProgressETA.setText)
-
-                self.listen_thread.listOfProjects_setCurrentItem.connect(mw.w_listOfProjects.setCurrentItem)
-                self.listen_thread.listOfProjects_setStyleSheet.connect(mw.w_listOfProjects.setStyleSheet)
-
-                # self.listen_thread.started.connect(self.listen_worker.run)
-                # self.listen_worker.finished.connect(self.listen_thread.quit)
-
-                # self.listen_worker.finished.connect(self.listen_worker.deleteLater)
-                # self.listen_thread.finished.connect(self.listen_thread.deleteLater)
-
+            if not self.listen_thread.isRunning():
                 self.listen_thread.start()
+
+            if not self.timer_thread.isRunning():
                 self.timer_thread.start()
 
             preset.process.wait()
 
-        if not preset.is_status('RENDERING_STOPPING'):
-            preset.set_status('RENDERING_FINISHED')
+        if not preset.is_status(status.RENDERING_STOPPING):
+            preset.set_status(status.RENDERING_FINISHED)
 
         if self.listen_thread and self.listen_thread.isRunning():
             self.listen_thread.wait(1000)
 
         if self.timer_thread and self.timer_thread.isRunning():
             self.timer_thread.wait(1000)
-
-        self.finished.emit()
 
 
 ################################################################################
@@ -244,7 +232,7 @@ class RenderTimerThread(qtc.QThread):
 
         while True:
 
-            if not preset.is_status('RENDERING'):
+            if not preset.is_status(status.RENDERING):
                 break
 
             current_time = time.time()
@@ -284,14 +272,10 @@ class RenderTimerThread(qtc.QThread):
 
             time.sleep(1.0)
 
-        self.finished.emit()
-
 
 ################################################################################
 
 class RenderListenThread(qtc.QThread):
-
-    finished = qtc.pyqtSignal()
 
     gProgressBar_setValue = qtc.pyqtSignal(int)
     gProgress_setText = qtc.pyqtSignal(str)
@@ -363,7 +347,7 @@ class RenderListenThread(qtc.QThread):
 
         while True:
 
-            if preset.is_status('RENDERING_STOPPING', 'RENDERING_FINISHED'):
+            if preset.is_status(status.RENDERING_STOPPING, status.RENDERING_FINISHED):
                 break
 
             try:
@@ -371,7 +355,7 @@ class RenderListenThread(qtc.QThread):
                 if not preset.process:
                     break
 
-                for line in TextIOWrapper(preset.process.stdout, encoding='utf-8'):
+                for line in preset.process.stdout:
                     log(line)
 
                     current_time = time.time()
@@ -522,17 +506,10 @@ class RenderListenThread(qtc.QThread):
 
                         continue
 
-                if not preset.process:
-                    break
-
-                for line in TextIOWrapper(preset.process.stdin, encoding='utf-8'):
-                    log(line)
-
             except Exception as e:
                 log(f'Exception during listening: {repr(e)}')
 
-
-        if preset.is_status('RENDERING_FINISHED'):
+        if preset.is_status(status.RENDERING_FINISHED):
             self.gProgress_setText.emit(f'{preset.global_frame}/{preset.global_frames}')
             self.pProgress_setText.emit(f'{preset.project_frame}/{preset.project_frames}')
             self.gProgressBar_setValue.emit(100)
@@ -543,7 +520,7 @@ class RenderListenThread(qtc.QThread):
 
             preset.shutdown()
 
-        elif preset.is_status('RENDERING_STOPPING'):
+        elif preset.is_status(status.RENDERING_STOPPING):
             audio.play(RENDER_STOP_AUDIO)
             log("Rendering stopped.")
 
@@ -553,9 +530,8 @@ class RenderListenThread(qtc.QThread):
         if self.exit_message:
             log(self.exit_message)
 
-        preset.set_status('READY_TO_RENDER')
+        preset.set_status(status.READY_TO_RENDER)
 
         monitor.screen_on()
 
         mw.update_widgets.emit()
-        self.finished.emit()
