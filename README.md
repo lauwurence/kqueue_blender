@@ -1,6 +1,4 @@
 # kQueue Blender
-Queue Blender projects and override settings.
-
 <img width="2479" height="1489" alt="image" src="https://github.com/user-attachments/assets/4a6d28a5-e8e5-4caf-bf0c-2a98792af92c" />
 
 ## What can it do:
