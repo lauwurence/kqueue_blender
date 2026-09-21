@@ -103,7 +103,7 @@ class QBlendProject(qtw.QWidget):
             label.setPixmap(
                 qtg.QIcon(f'kqueue/icons/{icon}.svg').pixmap(15, 15)
             )
-            label.setFixedSize(18, 18)
+            label.setFixedSize(15, 18)
             label.setToolTip(tooltip)
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
