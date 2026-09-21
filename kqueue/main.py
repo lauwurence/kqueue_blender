@@ -556,7 +556,7 @@ class MainWindow(qtw.QMainWindow):
 
         self.setWindowIcon(qtg.QIcon(ICON))
 
-        self.setMinimumWidth(1200)
+        self.setMinimumWidth(1100)
         self.setMinimumHeight(700)
         self.setAcceptDrops(True)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
@@ -1001,6 +1001,27 @@ class MainWindow(qtw.QMainWindow):
 
         self.update_title.emit()
 
+        self.settings = qtc.QSettings(
+            "KQueue",
+            "KQueue"
+        )
+
+        self.restore_window_geometry()
+
+
+    def restore_window_geometry(self):
+        geometry = self.settings.value("window/geometry")
+
+        if geometry:
+            self.restoreGeometry(geometry)
+
+
+    def save_window_geometry(self):
+        self.settings.setValue(
+            "window/geometry",
+            self.saveGeometry()
+        )
+
 
     def dragEnterEvent(self, event):
         """
@@ -1065,6 +1086,7 @@ class MainWindow(qtw.QMainWindow):
 
         if DEV_MODE:
             preset.stop_render()
+            self.save_window_geometry()
             event.accept()
             return
 
@@ -1109,6 +1131,7 @@ class MainWindow(qtw.QMainWindow):
                 preset.save()
 
         preset.stop_render()
+        self.save_window_geometry()
         event.accept()
 
 
