@@ -1,7 +1,7 @@
 # kQueue Blender
 Queue Blender projects and override settings.
 
-<img width="2798" height="1319" alt="image" src="https://github.com/user-attachments/assets/d5e6f62f-bf00-40a5-9c71-e44e0cd0d8eb" />
+<img width="2479" height="1489" alt="image" src="https://github.com/user-attachments/assets/4a6d28a5-e8e5-4caf-bf0c-2a98792af92c" />
 
 ## What can it do:
 1. Save and load kQueue project files.
@@ -12,8 +12,9 @@ Queue Blender projects and override settings.
 6. Render only unsaved images.
 7. Open last rendered image or path.
 8. Show thumbnail of the last rendered image in the folder.
-9. Turn screens off.
-10. Shutdown PC on complete.
+9. Monitor VRAM usage, GPU load and heat.
+10. Turn screens off.
+11. Shutdown PC on complete.
 
 ## Installation:
 Required libraries: PyQt6 (to draw the UI), psutil (to kill processes), pygame (to play sounds).
