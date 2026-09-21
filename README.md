@@ -4,19 +4,19 @@ Queue Blender projects and override settings.
 <img width="2798" height="1319" alt="image" src="https://github.com/user-attachments/assets/d5e6f62f-bf00-40a5-9c71-e44e0cd0d8eb" />
 
 ## What can it do:
-1. Save and load kQueue files.
+1. Save and load kQueue project files.
 2. Fetch and cache Blender project data.
 3. Exclude specific Blender projects from render queue.
-4. Render specific frame ranges, override render settings.
-5. Render in render preview mode (Workbench rendered, SubD 0).
-6. Render only non-existing images.
-7. Save as sRGB (if you work in other color spaces).
-8. Open last rendered image or its path.
+4. Render specific frames, override render settings.
+5. Render in fast preview mode (Workbench rendered + SubD 0).
+6. Render only unsaved images.
+7. Open last rendered image or path.
+8. Show thumbnail of the last rendered image in the folder.
 9. Turn screens off.
 10. Shutdown PC on complete.
 
 ## Installation:
-Required libraries: PyQt5 (to draw the UI), psutil (to kill processes), pygame (to play sounds).
+Required libraries: PyQt6 (to draw the UI), psutil (to kill processes), pygame (to play sounds).
 Install Python 3 and put this into the console:
 ```
 pip install PyQt5; pywin32; psutil; pygame; numpy; screeninfo; pynvml
