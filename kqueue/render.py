@@ -50,12 +50,12 @@ class RenderThread(qtc.QThread):
 
         audio.play(RENDER_START_AUDIO)
         preset.set_status(status.RENDERING)
+
         mw.update_widgets.emit()
 
-        for project in preset.project_list:
+        project_list = [ p for p in preset.project_list if p.is_renderable() ]
 
-            if not project.is_renderable():
-                continue
+        for project in project_list:
 
             if preset.is_status(status.RENDERING_STOPPING, status.RENDERING_FINISHED):
                 break
@@ -63,9 +63,6 @@ class RenderThread(qtc.QThread):
             sc = project.get_scene()
             fl = project.get_frames_list()
             ca = project.get_camera()
-
-            if not sc or not fl or not ca:
-                continue
 
             PYTOH_FILE = join(store.working_dir, "blender/temp/render_settings.py")
 
@@ -345,6 +342,9 @@ class RenderListenThread(qtc.QThread):
         saved_renders = []
         unsaved_renders = []
 
+        if mw.taskbar_progress:
+            mw.taskbar_progress.set_progress(1, total=100)
+
         while True:
 
             if preset.is_status(status.RENDERING_STOPPING, status.RENDERING_FINISHED):
@@ -453,6 +453,9 @@ class RenderListenThread(qtc.QThread):
                         self.gProgress_setText.emit(f'{preset.global_frame}/{preset.global_frames}')
                         self.pProgress_setText.emit(f'{preset.project_frame}/{preset.project_frames}')
 
+                        if mw.taskbar_progress:
+                            mw.taskbar_progress.set_progress(100, total=100)
+
                         if current_render and current_render not in saved_renders:
                             saved_renders.append(current_render)
 
@@ -491,6 +494,9 @@ class RenderListenThread(qtc.QThread):
                             self.gProgress_setText.emit(f'{max(0, preset.global_frame - 1)}/{preset.global_frames}')
                             self.pProgress_setText.emit(f'{max(0, preset.project_frame - 1)}/{preset.project_frames}')
 
+                            if mw.taskbar_progress:
+                                mw.taskbar_progress.set_progress(preset.global_frame, total=preset.global_frames)
+
                             # if current_render and (current_render not in unsaved_renders):
                             #     unsaved_renders.append(current_render)
 
@@ -526,6 +532,9 @@ class RenderListenThread(qtc.QThread):
 
         else:
             log(f"Status: {preset.blender_status}")
+
+        if mw.taskbar_progress:
+            mw.taskbar_progress.clear()
 
         if self.exit_message:
             log(self.exit_message)

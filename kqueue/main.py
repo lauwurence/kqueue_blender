@@ -2,6 +2,7 @@
 ## Main
 
 import os
+import sys
 import ctypes
 import subprocess
 
@@ -23,6 +24,7 @@ from .project.widgets import QBlendProject, QBlendProjectSettings
 
 from .render import RenderThread
 from .loader import LoaderThread
+from .taskbar import TaskbarProgress
 from .config import *
 from . import store, save_load, status
 
@@ -560,6 +562,11 @@ class MainWindow(qtw.QMainWindow):
         self.setMinimumHeight(700)
         self.setAcceptDrops(True)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+
+        self.taskbar_progress = None
+
+        if sys.platform == "win32":
+            self.taskbar_progress = TaskbarProgress(int(self.winId()))
 
         # [widget]
         w = qtw.QWidget()
