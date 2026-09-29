@@ -430,6 +430,11 @@ class RenderListenThread(qtc.QThread):
                         samples = int(found.group(2))
                         progress = max(0.0, min(1.0, float(sample) / float(samples)))
 
+                        if preset.global_frames == 1:
+
+                            if mw.taskbar_progress:
+                                mw.taskbar_progress.set_progress(round(progress * 100), total=100)
+
                         self.rProgressBar_setValue.emit(round(progress * 100))
 
                         continue
@@ -495,7 +500,7 @@ class RenderListenThread(qtc.QThread):
                             self.pProgress_setText.emit(f'{max(0, preset.project_frame - 1)}/{preset.project_frames}')
 
                             if mw.taskbar_progress:
-                                mw.taskbar_progress.set_progress(preset.global_frame, total=preset.global_frames)
+                                mw.taskbar_progress.set_progress(preset.global_frame - 1, total=preset.global_frames)
 
                             # if current_render and (current_render not in unsaved_renders):
                             #     unsaved_renders.append(current_render)
