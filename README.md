@@ -18,7 +18,7 @@
 Required libraries: PyQt6 (to draw the UI), psutil (to kill processes), pygame (to play sounds).
 Install Python 3 and put this into the console:
 ```
-pip install PyQt5; pywin32; psutil; pygame; numpy; screeninfo; pynvml
+pip install PyQt6; pywin32; psutil; pygame; numpy; screeninfo; pynvml
 ```
 
 ## Run:
