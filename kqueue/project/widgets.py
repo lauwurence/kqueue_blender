@@ -486,7 +486,6 @@ class QBlendProjectSettings(qtw.QWidget):
                     return
 
                 self.projectFilepath.setText(join(filepath))
-                project.set_file(filepath)
 
             self.locateProjectFilepath = QPushButton("", clicked=locate_project_filepath)
             self.locateProjectFilepath.setFixedWidth(30)
@@ -787,6 +786,7 @@ class QBlendProjectSettings(qtw.QWidget):
             nonlocal need_save
             need_save = True
 
+        set_value('file', self.projectFilepath.text())
         set_value('resolution_x_override', self.resX.text())
         set_value('resolution_y_override', self.resY.text())
         set_value('resolution_percentage_override', self.resPerc.text())
