@@ -89,6 +89,14 @@ class BlendProject():
         ])
 
 
+    def set_file(self, filepath):
+        """
+        Set .blend filepath.
+        """
+
+        self.file = filepath
+
+
     def file_exists(self):
         """
         Does the project file exist?
@@ -165,7 +173,7 @@ class BlendProject():
             rv = []
 
             for frame in filter_frames(frames) or []:
-                filename = self.compose_render_filename(frame)
+                filename = self.compose_render_filepath(frame)
 
                 if Path(filename).exists():
                     continue
@@ -177,34 +185,39 @@ class BlendProject():
         return filter_frames(frames) or []
 
 
-    def get_frames_list_string(self, frames=None):
+    def get_frames_list_text(self, frames=None):
         """
-        Get frames list as a string.
+        Get frames list as text.
         """
 
-        return ",".join([ str(frame) for frame in self.get_frames_list(frames) ])
+        frames_list = self.get_frames_list(frames)
+
+        return f'({len(frames_list)}): ' + ",".join([ str(frame) for frame in frames_list ])
 
 
     def get_notes(self):
         """
+        Get notes text.
         """
+
         return self.notes or ""
 
 
     def render_filepath_exists(self):
         """
+        Return True if render exists.
         """
 
         return Path(self.get_render_filepath()).parent.exists()
 
 
-    def compose_render_filename(self, frame):
+    def compose_render_filepath(self, frame):
         """
-        Compose render filename.
+        Compose render filename from frame.
         """
 
         format = self.get_file_format()
-        suffix = FORMATS.get(format, None)
+        suffix = FORMATS.get(format)
 
         if suffix is None:
             raise Exception(f'Unknown image format: {format}')
@@ -213,17 +226,17 @@ class BlendProject():
         path = Path(filepath)
         basename = path.stem
         zeros = basename.count("#") or 4
-        number = str(frame)
+        num = str(frame)
 
-        while len(number) < zeros:
-            number = "0" + number
+        while len(num) < zeros:
+            num = "0" + num
 
         to_replace = "#" * zeros
 
         if to_replace in basename:
-            basename = basename.replace(to_replace, number)
+            basename = basename.replace(to_replace, num)
         else:
-            basename += number
+            basename += num
 
         return path.parent / f'{basename}{suffix}'
 
@@ -246,6 +259,7 @@ class BlendProject():
     def get_resolution_percentage(self): return self.get(self.resolution_percentage_override, self.resolution_percentage) or 0
     def get_use_persistent_data(self): return self.get(self.use_persistent_data_override, self.use_persistent_data)
     def get_render_filepath(self): return join(self.get(self.render_filepath_override, self.render_filepath))
+    def get_project_filepath(self): return join(self.file)
     def get_file_format(self): return self.get(self.file_format_override, self.file_format)
     def get_use_adaptive_sampling(self): return self.get(self.use_adaptive_sampling_override, self.use_adaptive_sampling)
     def get_samples(self): return self.get(self.samples_override, self.samples)
@@ -307,7 +321,7 @@ class BlendProject():
 
     def get_render_output_image(self):
         """
-        Get render output image.
+        Get last render output image.
         """
 
         path = Path(self.get_render_filepath())
@@ -316,21 +330,13 @@ class BlendProject():
         if not dir.exists():
             return None
 
-        rv = None
+        for frame in reversed(self.get_frames_list()):
+            filename = self.compose_render_filepath(frame)
 
-        for local_path, _, files in dir.walk():
+            if Path(filename).exists():
+                return filename
 
-            for name in files:
-
-                if not name.startswith(path.stem):
-                    continue
-
-                if not name.endswith(tuple(FORMATS.values())):
-                    continue
-
-                rv = local_path / name
-
-        return rv
+        return None
 
 
     def open_render_output_image(self):

@@ -507,7 +507,7 @@ class RenderListenThread(qtc.QThread):
 
                             #     # Delete old render if the new one was not saved
                             #     p, f = current_render
-                            #     path = Path(p.compose_render_filename(f))
+                            #     path = Path(p.compose_render_filepath(f))
 
                             #     if path.exists():
                             #         path.unlink()

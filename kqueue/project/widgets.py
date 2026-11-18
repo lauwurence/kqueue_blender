@@ -138,8 +138,7 @@ class QBlendProject(qtw.QWidget):
         # [icon + label] Frames
         self.w_frames_icon = add_icon_label(
             'frames',
-            'Frames'
-        )
+            'Frames')
 
         self.w_frames = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_frames)
@@ -150,8 +149,7 @@ class QBlendProject(qtw.QWidget):
         # [icon + label] Resolution
         self.w_resolution_icon = add_icon_label(
             'resolution',
-            'Resolution'
-        )
+            'Resolution')
 
         self.w_resolution = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_resolution)
@@ -162,8 +160,7 @@ class QBlendProject(qtw.QWidget):
         # [icon + label] Samples
         self.w_samples_icon = add_icon_label(
             'samples',
-            'Samples'
-        )
+            'Samples')
 
         self.w_samples = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_samples)
@@ -174,8 +171,7 @@ class QBlendProject(qtw.QWidget):
         # [icon + label] Camera
         self.w_camera_icon = add_icon_label(
             'camera',
-            'Camera'
-        )
+            'Camera')
 
         self.w_camera = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_camera)
@@ -186,21 +182,14 @@ class QBlendProject(qtw.QWidget):
         # [icon + label] Output
         self.w_render_filepath_icon = add_icon_label(
             'output',
-            'Render output'
-        )
+            'Render output')
 
         self.w_render_filepath = qtw.QLabel()
         self.w_hBoxLayout.addWidget(self.w_render_filepath)
 
         # [button] Render Thumbnail / Open Render
-        self.w_open_render_image = QPushButton(
-            "",
-            clicked=project.open_render_output_image
-        )
-
-        self.w_open_render_image.setToolTip("Open the last render.")
-        self.w_open_render_image.setFlat(True)
-
+        self.w_open_render_image = QPushButton("", clicked=project.open_render_output_image)
+        self.w_open_render_image.setToolTip("Open last render.")
         self.w_hBoxLayout.addWidget(self.w_open_render_image)
 
         add_separator()
@@ -212,7 +201,6 @@ class QBlendProject(qtw.QWidget):
         self.w_open_render_folder.setToolTip("Open render folder.")
         self.w_open_render_folder.setIconSize(qtc.QSize(15, 15))
         self.w_open_render_folder.setFixedSize(22, 22)
-        self.w_open_render_folder.setFlat(True)
         self.w_hBoxLayout.addWidget(self.w_open_render_folder)
 
         # [stretch]
@@ -230,6 +218,7 @@ class QBlendProject(qtw.QWidget):
         ]
 
         self.update_widgets()
+
 
     def __load_thumbnail(self, filename):
         filename = str(filename)
@@ -457,7 +446,7 @@ class QBlendProjectSettings(qtw.QWidget):
         self.setWindowTitle(str(self.project.file))
         self.setWindowIcon(qtg.QIcon(ICON))
         self.setMinimumWidth(450)
-        self.setFixedHeight(525)
+        # self.setFixedHeight(525)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.resize(450, 400)
 
@@ -471,6 +460,41 @@ class QBlendProjectSettings(qtw.QWidget):
         # [form] Preset Override
         l_form = qtw.QFormLayout()
         layout.addLayout(l_form)
+
+        # [hbox] .blend file
+        hbox = qtw.QHBoxLayout()
+        l_form.addRow("Project", hbox)
+
+        if True:
+
+            # [edit] Render Filepath
+            self.projectFilepath = qtw.QLineEdit(str(project.get_project_filepath()))
+            self.projectFilepath.setEnabled(False)
+            self.projectFilepath.setFixedHeight(FIELD_HEIGHT)
+            self.projectFilepath.setPlaceholderText(str(project.get_project_filepath()))
+            hbox.addWidget(self.projectFilepath)
+
+            # [button] Render Filepath
+            def locate_project_filepath():
+                filepath, _ = qtw.QFileDialog.getOpenFileName(
+                    self,
+                    'Set Project Filepath',
+                    self.projectFilepath.text(),
+                    '*.blend')
+
+                if not filepath:
+                    return
+
+                self.projectFilepath.setText(join(filepath))
+                project.set_file(filepath)
+
+            self.locateProjectFilepath = QPushButton("", clicked=locate_project_filepath)
+            self.locateProjectFilepath.setFixedWidth(30)
+            self.locateProjectFilepath.setFixedHeight(FIELD_HEIGHT)
+            self.locateProjectFilepath.setIcon(qtg.QIcon('kqueue/icons/blender.svg'))
+            self.locateProjectFilepath.setIconSize(qtc.QSize(18, 18))
+            self.locateProjectFilepath.clicked.connect(lambda: store.mw.update_widgets.emit())
+            hbox.addWidget(self.locateProjectFilepath)
 
 
         # [hbox] Frames
@@ -503,7 +527,7 @@ class QBlendProjectSettings(qtw.QWidget):
 
         def update_result():
             try:
-                tt = project.get_frames_list_string(frames=self.frames.text())
+                tt = project.get_frames_list_text(frames=self.frames.text())
             except:
                 tt = "!"
 

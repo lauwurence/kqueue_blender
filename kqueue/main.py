@@ -205,6 +205,22 @@ class QueuePreset():
         self.set_need_save()
 
 
+    def new_project(self):
+        """
+        Create a new project.
+        """
+
+        self.project_list.clear()
+
+        self.set_save(None)
+        self.set_need_save(False)
+
+        mw.update_list.emit(False)
+        mw.update_widgets.emit()
+
+        log('New project created.')
+
+
     def save(self):
         """
         """
@@ -318,7 +334,7 @@ class QueuePreset():
         Set currently loaded save.
         """
 
-        if not filename or not Path(filename).exists():
+        if filename and not Path(filename).exists():
             return
 
         self.filename = filename
@@ -582,39 +598,45 @@ class MainWindow(qtw.QMainWindow):
             w_hBoxLayout = qtw.QHBoxLayout()
             w_vBoxLayout.addLayout(w_hBoxLayout)
 
+            # [button] New Project
+            self.newProject = QPushButton("", clicked=lambda: preset.new_project())
+            self.newProject.setFixedHeight(26)
+            self.newProject.setIcon(qtg.QIcon('kqueue/icons/new_project.svg'))
+            self.newProject.setIconSize(qtc.QSize(18, 18))
+            self.newProject.setToolTip("Create a new project.")
+            self.newProject.clicked.connect(lambda: self.update_widgets.emit())
+            w_hBoxLayout.addWidget(self.newProject)
+
             # [button] Locate Save
-            self.projectSave = QPushButton("", clicked=lambda: preset.save())
+            self.projectSave = QPushButton("", clicked=lambda: preset.save_as())
             self.projectSave.setFixedHeight(26)
             self.projectSave.setIcon(qtg.QIcon('kqueue/icons/save.svg'))
             self.projectSave.setIconSize(qtc.QSize(18, 18))
-            self.projectSave.setToolTip("Save the current file in the desired location.")
+            self.projectSave.setToolTip("Save the project in a desired location.")
             self.projectSave.setShortcut(qtg.QKeySequence("Ctrl+Shift+S"))
             self.projectSave.clicked.connect(lambda: self.update_widgets.emit())
             w_hBoxLayout.addWidget(self.projectSave)
 
             # [shortcut] Save
-            qtg.QShortcut(
-                qtg.QKeySequence('Ctrl+S'),
-                self
-            ).activated.connect(lambda: preset.save())
+            qtg.QShortcut(qtg.QKeySequence('Ctrl+S'), self).activated.connect(lambda: preset.save())
 
             # [button] Load
             self.projectLoad = QPushButton("", clicked=lambda: preset.load_from())
             self.projectLoad.setFixedHeight(26)
             self.projectLoad.setIcon(qtg.QIcon('kqueue/icons/folder.svg'))
             self.projectLoad.setIconSize(qtc.QSize(18, 18))
-            self.projectLoad.setToolTip("Open a kQueue file.")
+            self.projectLoad.setToolTip("Open a .kqp project file.")
             self.projectLoad.clicked.connect(lambda: self.update_widgets.emit())
             w_hBoxLayout.addWidget(self.projectLoad)
 
-            # [button] Reload
-            self.projectReload = QPushButton("", clicked=lambda: preset.reload())
-            self.projectReload.setFixedHeight(26)
-            self.projectReload.setIcon(qtg.QIcon('kqueue/icons/reset.svg'))
-            self.projectReload.setIconSize(qtc.QSize(18, 18))
-            self.projectReload.setToolTip("Reset project.")
-            self.projectReload.clicked.connect(lambda: self.update_widgets.emit())
-            w_hBoxLayout.addWidget(self.projectReload)
+            # # [button] Reload
+            # self.projectReload = QPushButton("", clicked=lambda: preset.reload())
+            # self.projectReload.setFixedHeight(26)
+            # self.projectReload.setIcon(qtg.QIcon('kqueue/icons/reset.svg'))
+            # self.projectReload.setIconSize(qtc.QSize(18, 18))
+            # self.projectReload.setToolTip("Reload project.")
+            # self.projectReload.clicked.connect(lambda: self.update_widgets.emit())
+            # w_hBoxLayout.addWidget(self.projectReload)
 
             # [edit] Path to Blender
             self.w_pathToBlender = w_pathToBlender = qtw.QLineEdit("Locate blender.exe first!")
@@ -623,10 +645,7 @@ class MainWindow(qtw.QMainWindow):
             w_hBoxLayout.addWidget(w_pathToBlender)
 
             # [button] Locate Blender
-            self.w_locateBlender = w_locateBlender = QPushButton(
-                "",
-                clicked=lambda: preset.locate_blender()
-            )
+            self.w_locateBlender = w_locateBlender = QPushButton("", clicked=lambda: preset.locate_blender())
             w_locateBlender.clicked.connect(lambda: self.update_widgets.emit())
             w_locateBlender.setIcon(qtg.QIcon('kqueue/icons/blender.svg'))
             w_locateBlender.setIconSize(qtc.QSize(18, 18))
@@ -641,14 +660,8 @@ class MainWindow(qtw.QMainWindow):
 
         self.w_listOfProjects = w_listOfProjects = QListWidget()
         w_listOfProjects.itemDoubleClicked.connect(open_project_settings)
-
-        w_listOfProjects.setDragDropMode(
-            qtw.QAbstractItemView.DragDropMode.InternalMove
-        )
-
-        w_listOfProjects.model().rowsMoved.connect(
-            lambda: self.update_list.emit(True)
-        )
+        w_listOfProjects.setDragDropMode(qtw.QAbstractItemView.DragDropMode.InternalMove)
+        w_listOfProjects.model().rowsMoved.connect(lambda: self.update_list.emit(True))
 
         w_vBoxLayout.addWidget(w_listOfProjects)
 
@@ -714,7 +727,6 @@ class MainWindow(qtw.QMainWindow):
         w_marker_render.clicked.connect(lambda: toggle_marker_render())
 
         w_hBoxLayout.addStretch()
-
 
         l_form = qtw.QFormLayout()
         w_hBoxLayout.addLayout(l_form)
@@ -1311,9 +1323,10 @@ class MainWindow(qtw.QMainWindow):
     def __update_widgets(self):
 
         if preset.is_status(status.RENDERING, status.RENDERING_STOPPING):
+            self.newProject.setEnabled(False)
             self.projectSave.setEnabled(False)
             self.projectLoad.setEnabled(False)
-            self.projectReload.setEnabled(False)
+            # self.projectReload.setEnabled(False)
             self.w_locateBlender.setEnabled(False)
             self.w_selective.setEnabled(False)
             self.w_preview_render.setEnabled(False)
@@ -1326,9 +1339,10 @@ class MainWindow(qtw.QMainWindow):
                 widget.setEnabled(False)
 
         else:
+            self.newProject.setEnabled(True)
             self.projectSave.setEnabled(True)
             self.projectLoad.setEnabled(True)
-            self.projectReload.setEnabled(True)
+            # self.projectReload.setEnabled(True)
             self.w_locateBlender.setEnabled(True)
             self.w_selective.setEnabled(True)
             self.w_preview_render.setEnabled(True)
@@ -1518,6 +1532,11 @@ def __start_periodic(interval=1.0):
 def main():
 
     try:
+
+        if DEV_MODE:
+            from kqueue.project.association import register_file_association
+            register_file_association()
+
         delete_log()
 
         __start_periodic()
