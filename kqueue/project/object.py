@@ -166,18 +166,18 @@ class BlendProject():
         return ",".join([ str(m) for m in markers])
 
 
-    def get_frames_list(self, frames=None):
+    def get_frames_list(self, frames=None, all=False):
         """
         Get frames as an int list.
         """
 
         if not frames:
-            if not store.preset.marker_render:
-                frames = self.get_frames()
-            else:
+            if store.preset.marker_render and not all:
                 frames = self.get_markers()
+            else:
+                frames = self.get_frames()
 
-        if store.preset.selective_render:
+        if store.preset.selective_render and not all:
             rv = []
 
             for frame in filter_frames(frames) or []:
@@ -338,7 +338,7 @@ class BlendProject():
         if not dir.exists():
             return None
 
-        for frame in reversed(self.get_frames_list()):
+        for frame in reversed(self.get_frames_list(all=True)):
             filename = self.compose_render_filepath(frame)
 
             if Path(filename).exists():
