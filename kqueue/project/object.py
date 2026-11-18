@@ -94,7 +94,15 @@ class BlendProject():
         Set .blend filepath.
         """
 
-        self.file = filepath
+        self.file = join(filepath)
+
+
+    def get_file(self):
+        """
+        Get .blend filepath.
+        """
+
+        return join(self.file)
 
 
     def file_exists(self):
